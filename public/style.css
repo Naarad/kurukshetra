@@ -626,6 +626,19 @@ body.is-mobile #game { height: 60vh; min-height: 360px; }
 body.is-mobile .sidebar { max-height: 30vh; overflow: auto; }
 
 /* =========================================================
+   Leave-room button
+   ========================================================= */
+button.btn-leave {
+  border-color: #6e1f15 !important;
+  color: var(--kaurava-glow) !important;
+}
+button.btn-leave:hover {
+  border-color: var(--kaurava) !important;
+  color: #fff !important;
+  background: rgba(140, 30, 22, 0.15) !important;
+}
+
+/* =========================================================
    Maze-mode toggle
    ========================================================= */
 .maze-toggle .maze-btn {

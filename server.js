@@ -61,6 +61,22 @@ io.on('connection', (socket) => {
     getRoom(currentRoom).broadcast();
   });
 
+  socket.on('leaveRoom', () => {
+    if (!currentRoom) return;
+    const m = getRoom(currentRoom);
+    socket.to(currentRoom).emit('voice-peer-left', { peerId: socket.id });
+    socket.leave(currentRoom);
+    m.removePlayer(socket.id);
+    if (m.players.size === 0) {
+      m.destroy();
+      rooms.delete(currentRoom);
+    } else {
+      m.broadcast();
+    }
+    currentRoom = null;
+    socket.emit('leftRoom');
+  });
+
   socket.on('removeBots', () => {
     if (!currentRoom) return;
     getRoom(currentRoom).removeAllBots();

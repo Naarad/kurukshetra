@@ -112,6 +112,32 @@ function setMazeModeUI(mode) {
   $$('.maze-btn').forEach(b => b.classList.toggle('active', b.dataset.maze === mode));
 }
 
+// ----------------- leave room -----------------
+function leaveRoom() {
+  // confirm if mid-match
+  const inMatch = lastSnap && (lastSnap.phase === 'setup' || lastSnap.phase === 'break');
+  if (inMatch && !confirm('Leave the field? You will abandon the round in progress.')) return;
+  // tear down voice
+  if (window.Voice) window.Voice.disableMic && window.Voice.disableMic();
+  // tell server
+  socket?.emit('leaveRoom');
+  // local cleanup
+  if (socket) { socket.disconnect(); socket = null; }
+  lastSnap = null;
+  mySocketId = null;
+  myRoom = null;
+  // hide voice bar + briefing + overlays
+  $('#voice-bar').classList.add('hidden');
+  $('#briefing').classList.add('hidden');
+  $('#overlay').classList.add('hidden');
+  $('#mobile-controls').classList.add('hidden');
+  // back to join screen with their name preserved (we never cleared the input)
+  show('screen-join');
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-leave]')) leaveRoom();
+});
+
 // ----------------- music toggle -----------------
 $('#btnMusic')?.addEventListener('click', async () => {
   if (!window.Music) return;
