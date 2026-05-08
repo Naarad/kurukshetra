@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kurukshetra — Pandavas vs Kauravas</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- ambient particles -->
+  <div id="bg-embers"></div>
+
+  <div id="app">
+    <!-- LOBBY / JOIN -->
+    <section id="screen-join" class="screen">
+      <div class="card">
+        <div class="om-mark">ॐ</div>
+        <h1>Kurukshetra</h1>
+        <p class="subtitle">The dharma-yuddha. Break the vyuha. Survive the maze. Forge a legend.</p>
+        <label>Your name<input id="displayName" maxlength="18" placeholder="e.g. Naarad" /></label>
+        <label>Room code<input id="roomId" maxlength="20" placeholder="kurukshetra" value="kurukshetra" /></label>
+        <button id="btnJoin">⚔️ Enter the field</button>
+        <button id="btnRulesJoin" class="secondary">📜 How to play</button>
+        <p class="hint">Share the room code + your ngrok URL with friends to play together.</p>
+      </div>
+    </section>
+
+    <!-- LOBBY / CHARACTER SELECT -->
+    <section id="screen-select" class="screen hidden">
+      <header class="hud">
+        <div class="brand">⚔️ Kurukshetra <span class="room"></span></div>
+        <div class="hud-actions">
+          <div class="mode-toggle" role="tablist">
+            <button data-mode="auto" class="mode-btn active">🎲 Auto-assign</button>
+            <button data-mode="manual" class="mode-btn">🎯 Pick manually</button>
+          </div>
+          <button id="btnRulesLobby" class="ghost">📜 How to play</button>
+        </div>
+      </header>
+
+      <!-- AUTO MODE — random lobby -->
+      <div id="auto-lobby" class="auto-lobby">
+        <div class="auto-explainer">
+          <h2>🎲 The Lots of Vyasa</h2>
+          <p>Sage Vyasa shuffles all warriors who have entered. When everyone is ready, he <em>casts the lots</em> — each player is randomly placed into Pandavas or Kauravas and assigned a unique role. Teams stay fair, no two players the same hero.</p>
+        </div>
+        <div class="player-bench" id="playerBench"></div>
+        <div class="ready-bar">
+          <button id="btnReadyAuto">I'm ready</button>
+          <button id="btnAddBot" class="secondary">🤖 Add bot</button>
+          <button id="btnClearBots" class="ghost">Clear bots</button>
+          <div class="ready-summary" id="readySummary"></div>
+        </div>
+      </div>
+
+      <!-- MANUAL MODE — original select grid -->
+      <div id="manual-select" class="manual-select hidden">
+        <div class="select-grid">
+          <div class="team-col" data-team="pandavas">
+            <div class="team-banner pandava-banner">
+              <h2>🪷 Pandavas <span class="count"></span></h2>
+              <div class="motto">Dharma · Truth · Five sons of Pandu, with Krishna</div>
+            </div>
+            <div class="roster" id="roster-pandavas"></div>
+            <button class="join-team" data-team="pandavas">Join Pandavas</button>
+          </div>
+          <div class="team-col" data-team="kauravas">
+            <div class="team-banner kaurava-banner">
+              <h2>🐍 Kauravas <span class="count"></span></h2>
+              <div class="motto">Power · Cunning · One hundred sons of Dhritarashtra, led by Bhishma</div>
+            </div>
+            <div class="roster" id="roster-kauravas"></div>
+            <button class="join-team" data-team="kauravas">Join Kauravas</button>
+          </div>
+        </div>
+        <div class="ready-bar">
+          <button id="btnReady">I'm ready</button>
+          <div id="readyList" class="ready-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARENA -->
+    <section id="screen-arena" class="screen hidden">
+      <header class="hud arena-hud">
+        <div class="brand">⚔️ Kurukshetra</div>
+        <div class="phase-banner"></div>
+        <div class="hud-right">
+          <div class="score">
+            <span class="pandavas">🪷 <b>0</b></span>
+            <span class="vs">vs</span>
+            <span class="kauravas">🐍 <b>0</b></span>
+          </div>
+          <button id="btnRulesArena" class="ghost-sm">📜</button>
+        </div>
+      </header>
+      <div class="arena-wrap">
+        <canvas id="game" width="1600" height="1152"></canvas>
+        <aside class="sidebar">
+          <div id="myCard" class="me-card"></div>
+          <div id="abilities" class="abilities"></div>
+          <div id="events" class="events"></div>
+          <div id="legend" class="legend">
+            <div><b>Move</b> WASD / arrows</div>
+            <div><b>Aim</b> mouse</div>
+            <div><b>Attack</b> Click / Space</div>
+            <div><b>Ability</b> E / Right-click</div>
+            <div><b>Astra</b> Q (when unlocked)</div>
+            <div class="setup-only"><b>Setup</b> click tile to place trap</div>
+          </div>
+        </aside>
+      </div>
+      <div id="overlay" class="overlay hidden"></div>
+
+      <!-- Mobile touch controls -->
+      <div id="mobile-controls" class="mobile-controls hidden">
+        <div class="touch-zone touch-move" id="touch-move">
+          <div class="stick-base"></div>
+          <div class="stick-knob" id="moveKnob"></div>
+          <div class="touch-label">MOVE</div>
+        </div>
+        <div class="touch-zone touch-aim" id="touch-aim">
+          <div class="stick-base"></div>
+          <div class="stick-knob" id="aimKnob"></div>
+          <div class="touch-label">AIM · TAP TO FIRE</div>
+        </div>
+        <div class="touch-buttons">
+          <button class="tbtn" id="btnAbility">E</button>
+          <button class="tbtn astra" id="btnAstra">Q</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RULES MODAL -->
+    <div id="rules-modal" class="rules-modal hidden">
+      <div class="rules-card">
+        <button class="close-x" data-close-rules>✕</button>
+        <h2>📜 The Dharma-Yuddha</h2>
+        <p class="lead">Two armies face each other on a sacred field. The Pandavas, led by truth and Krishna's wisdom. The Kauravas, ruled by ambition and Bhishma's iron resolve. The maze that lies between them is no ordinary thing — it is a <em>vyuha</em>, a battle formation drawn from Mahabharat itself.</p>
+
+        <h3>🌀 The Four Vyuhas</h3>
+        <div class="vyuha-list">
+          <div class="vyuha"><b>Chakravyuha</b> — the spiral wheel arranged by Drona on Day 13. Six concentric rings, each gap rotated. Abhimanyu broke six before he fell.</div>
+          <div class="vyuha"><b>Padmavyuha</b> — the lotus formation. Petals radiate outward; only Arjuna and Krishna fully knew how to enter <em>and</em> exit.</div>
+          <div class="vyuha"><b>Garudavyuha</b> — the eagle formation, named for Vishnu's mount. Wide wings, killing beak at the spearhead.</div>
+          <div class="vyuha"><b>Makaravyuha</b> — the crocodile formation. Long, narrow, with a crushing jaw at the head.</div>
+        </div>
+
+        <h3>⚔️ How a round unfolds</h3>
+        <ol class="numbered">
+          <li><b>Setup phase (60 seconds).</b> The defending team sees the vyuha and clicks tiles to place hidden spike traps (max 4 each). Attackers see only the walls.</li>
+          <li><b>Break phase (3 minutes).</b> The attacking team spawns at the green <span class="entry-pip">ENTRY</span>. They must reach the gold <span class="exit-pip">EXIT</span> alive. Even one survivor reaching the exit means victory.</li>
+          <li><b>Round ends</b> when an attacker touches the exit, all attackers fall, or the timer expires.</li>
+          <li><b>Teams swap</b> attacker/defender roles after each round. <b>First to 3 wins</b> claims the war.</li>
+        </ol>
+
+        <h3>🧙 Astras — divine weapons</h3>
+        <p>Each warrior carries a divine astra unlocked by deeds: kills, time alive, damage taken, allies remaining. When the seal breaks, press <kbd>Q</kbd> to unleash. Some astras may only be used <em>once per match</em> — choose your moment.</p>
+        <ul class="astra-list">
+          <li><b>Pashupatastra</b> (Arjuna) — Shiva's piercing kill-beam.</li>
+          <li><b>Vasavi Shakti</b> (Karna) — Indra's spear, single-use, instant kill.</li>
+          <li><b>Vishwarupa</b> (Krishna) — cosmic form, mass stun in awe.</li>
+          <li><b>Icchamrityu</b> (Bhishma) — cannot die for 8 seconds.</li>
+          <li><b>Narayanastra</b> (Ashwatthama) — arrow rain when his side is broken.</li>
+          <li>and many more…</li>
+        </ul>
+
+        <h3>🎮 Controls</h3>
+        <table class="ctrl">
+          <tr><th>Move</th><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys</td></tr>
+          <tr><th>Aim</th><td>Mouse</td></tr>
+          <tr><th>Basic attack</th><td><kbd>Space</kbd> or left-click</td></tr>
+          <tr><th>Ability</th><td><kbd>E</kbd> or right-click</td></tr>
+          <tr><th>Astra</th><td><kbd>Q</kbd> (when unlocked)</td></tr>
+          <tr><th>Place trap</th><td>Left-click a tile during setup</td></tr>
+        </table>
+
+        <h3>🏆 Winning</h3>
+        <p>Best of 5 rounds. Side that wins three rounds first wins the war. Even one survivor in the maze wins the round — the Mahabharat is won not by numbers but by who is left standing.</p>
+
+        <p class="closing">May your bowstring be true. May your dharma be clear. <em>Yuddhaaya krita-nishchayah</em> — resolved upon battle.</p>
+        <button class="primary" data-close-rules>Begin</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Voice control bar (visible after joining a room) -->
+  <div id="voice-bar" class="voice-bar hidden">
+    <button id="btnVoiceEnable" class="voice-btn primary-voice">🎤 Enable mic</button>
+    <button id="btnVoiceMute" class="voice-btn hidden">🔇 Mute</button>
+    <span class="voice-channel" id="voiceChannel">Team channel</span>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/voice.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>
