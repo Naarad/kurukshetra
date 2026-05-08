@@ -34,6 +34,10 @@
             <button data-mode="auto" class="mode-btn active">🎲 Auto-assign</button>
             <button data-mode="manual" class="mode-btn">🎯 Pick manually</button>
           </div>
+          <div class="mode-toggle maze-toggle" role="tablist" title="Maze style">
+            <button data-maze="classical" class="maze-btn active">🌀 Classical vyuhas</button>
+            <button data-maze="freebuild" class="maze-btn">🧱 Free build</button>
+          </div>
           <button id="btnRulesLobby" class="ghost">📜 How to play</button>
         </div>
       </header>
@@ -190,10 +194,27 @@
     <button id="btnVoiceEnable" class="voice-btn primary-voice">🎤 Enable mic</button>
     <button id="btnVoiceMute" class="voice-btn hidden">🔇 Mute</button>
     <span class="voice-channel" id="voiceChannel">Team channel</span>
+    <button id="btnMusic" class="voice-btn">🎵 Music</button>
+  </div>
+
+  <!-- Pre-round briefing card -->
+  <div id="briefing" class="briefing hidden">
+    <div class="briefing-card">
+      <div class="briefing-period"></div>
+      <h2 class="briefing-name"></h2>
+      <div class="briefing-architect"></div>
+      <p class="briefing-lore"></p>
+      <div class="briefing-strategy">
+        <div><b>⚔️ Attackers:</b> <span class="strat-att"></span></div>
+        <div><b>🛡 Defenders:</b> <span class="strat-def"></span></div>
+      </div>
+      <button class="primary briefing-dismiss">Take the field</button>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/voice.js"></script>
+  <script src="/music.js"></script>
   <script src="/client.js"></script>
 </body>
 </html>

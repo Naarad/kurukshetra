@@ -91,6 +91,17 @@ io.on('connection', (socket) => {
     getRoom(currentRoom).placeTrap(socket.id, x, y);
   });
 
+  socket.on('toggleWall', ({ x, y }) => {
+    if (!currentRoom) return;
+    getRoom(currentRoom).toggleWall(socket.id, x, y);
+  });
+
+  socket.on('setMazeMode', ({ mode }) => {
+    if (!currentRoom) return;
+    getRoom(currentRoom).setMazeMode(mode);
+    getRoom(currentRoom).broadcast();
+  });
+
   // -------- WebRTC voice signaling (relay only) --------
   // Forward SDP / ICE between peers in the same room without inspecting them.
   socket.on('voice-signal', ({ to, payload }) => {

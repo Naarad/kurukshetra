@@ -1,6 +1,7 @@
 // Procedural generators for Mahabharat battle formations.
-// Each returns: { width, height, cellSize, walls: Set<"x,y">, entry: {x,y}, exit: {x,y}, name, lore }
-// Coords are in tile units. World pixel size = width*cellSize x height*cellSize.
+// Each generator is seeded so subsequent rounds produce visually different
+// variants of the same formation flavor (different ring counts, gap angles,
+// mirror, jitter, entry/exit positions). The pattern stays recognizable.
 
 const CELL = 32;
 const GRID_W = 50;
@@ -20,165 +21,247 @@ function addBorder(walls) {
   }
 }
 
-// CHAKRAVYUHA — concentric rings with rotating gaps (the spiral that killed Abhimanyu).
-function chakravyuha() {
-  const walls = emptyWalls();
-  addBorder(walls);
-  const cx = Math.floor(GRID_W / 2);
-  const cy = Math.floor(GRID_H / 2);
-  const rings = [4, 7, 10, 13];
-  rings.forEach((r, idx) => {
-    // gap angle rotates per ring so it's a real spiral puzzle
-    const gapAngle = (idx * 1.1) % (Math.PI * 2);
-    for (let a = 0; a < 360; a += 4) {
-      const rad = a * Math.PI / 180;
-      // skip a ~30 deg gap so the player can pass through
-      const diff = Math.abs(((rad - gapAngle + Math.PI) % (Math.PI * 2)) - Math.PI);
-      if (diff < 0.26) continue;
-      const x = Math.round(cx + Math.cos(rad) * r);
-      const y = Math.round(cy + Math.sin(rad) * r);
-      if (x > 0 && x < GRID_W - 1 && y > 0 && y < GRID_H - 1) walls.add(key(x, y));
-    }
-  });
-  return {
-    name: 'Chakravyuha',
-    lore: 'The spiral wheel formation. Drona arranged it on Day 13. Abhimanyu broke six rings before falling.',
-    width: GRID_W, height: GRID_H, cellSize: CELL,
-    walls,
-    entry: { x: 1, y: cy },
-    exit: { x: cx, y: cy },
-    suggestedTrapZones: [
-      { x: cx - 6, y: cy - 6, w: 12, h: 12 }
-    ]
+// mulberry32 PRNG so the same seed gives the same maze (useful for testing)
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return function rng() {
+    s += 0x6D2B79F5;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+function randInt(rng, lo, hi) { return Math.floor(lo + rng() * (hi - lo + 1)); }
+function inBounds(x, y) { return x > 0 && x < GRID_W - 1 && y > 0 && y < GRID_H - 1; }
+function formationResult(v) { return { ...v, width: GRID_W, height: GRID_H, cellSize: CELL }; }
 
-// PADMAVYUHA — lotus petals: chambered arcs around a center.
-function padmavyuha() {
+// CHAKRAVYUHA — concentric rings with rotating gaps
+function chakravyuha(seed) {
+  const rng = makeRng(seed);
   const walls = emptyWalls();
   addBorder(walls);
-  const cx = Math.floor(GRID_W / 2);
-  const cy = Math.floor(GRID_H / 2);
-  const petals = 6;
-  const petalLen = 12;
+  const cx = Math.floor(GRID_W / 2) + randInt(rng, -3, 3);
+  const cy = Math.floor(GRID_H / 2) + randInt(rng, -2, 2);
+  const numRings = randInt(rng, 3, 5);
+  const baseR = randInt(rng, 3, 5);
+  const ringStep = randInt(rng, 3, 4);
+  const gapWidth = 0.20 + rng() * 0.18;
+  const baseGapAngle = rng() * Math.PI * 2;
+  const angleStep = (rng() * 1.6) - 0.8;
+
+  for (let idx = 0; idx < numRings; idx++) {
+    const r = baseR + idx * ringStep;
+    const gapAngle = (baseGapAngle + idx * angleStep) % (Math.PI * 2);
+    for (let a = 0; a < 360; a += 4) {
+      const rad = a * Math.PI / 180;
+      const diff = Math.abs(((rad - gapAngle + Math.PI) % (Math.PI * 2)) - Math.PI);
+      if (diff < gapWidth) continue;
+      const x = Math.round(cx + Math.cos(rad) * r);
+      const y = Math.round(cy + Math.sin(rad) * r);
+      if (inBounds(x, y)) walls.add(key(x, y));
+    }
+  }
+  const entrySide = randInt(rng, 0, 3);
+  const entry = pickEntry(entrySide, cy, cx);
+  return formationResult({
+    name: 'Chakravyuha',
+    period: 'Day 13',
+    architect: 'Drona',
+    lore: 'The spiral wheel formation arranged by Drona on the thirteenth day of Kurukshetra. Concentric rings of soldiers, each gap rotated, designed so an attacker who entered could not find their way out. Abhimanyu, son of Arjuna, learned the entry but not the exit — he broke six rings before the seventh closed and seven warriors slew him together.',
+    strategy: {
+      attackers: 'Move radially toward the center. Watch the rotation of each ring — the gaps don\'t line up.',
+      defenders: 'Trap the gaps and the centre. The deeper an attacker goes, the harder it is for them to retreat.'
+    },
+    walls,
+    entry,
+    exit: { x: cx, y: cy },
+    suggestedTrapZones: [{ x: cx - 6, y: cy - 6, w: 12, h: 12 }]
+  });
+}
+
+// PADMAVYUHA — lotus petals
+function padmavyuha(seed) {
+  const rng = makeRng(seed);
+  const walls = emptyWalls();
+  addBorder(walls);
+  const cx = Math.floor(GRID_W / 2) + randInt(rng, -2, 2);
+  const cy = Math.floor(GRID_H / 2) + randInt(rng, -2, 2);
+  const petals = randInt(rng, 5, 8);
+  const petalLen = randInt(rng, 9, 13);
+  const petalRot = rng() * Math.PI * 2;
+  const opening = 0.14 + rng() * 0.14;
   for (let p = 0; p < petals; p++) {
-    const angle = (p / petals) * Math.PI * 2;
+    const angle = petalRot + (p / petals) * Math.PI * 2;
     for (let l = 2; l < petalLen; l++) {
-      // two diverging walls per petal
-      const ax = Math.round(cx + Math.cos(angle - 0.18) * l);
-      const ay = Math.round(cy + Math.sin(angle - 0.18) * l);
-      const bx = Math.round(cx + Math.cos(angle + 0.18) * l);
-      const by = Math.round(cy + Math.sin(angle + 0.18) * l);
+      const ax = Math.round(cx + Math.cos(angle - opening) * l);
+      const ay = Math.round(cy + Math.sin(angle - opening) * l);
+      const bx = Math.round(cx + Math.cos(angle + opening) * l);
+      const by = Math.round(cy + Math.sin(angle + opening) * l);
       if (l > 2) {
-        if (ax > 0 && ax < GRID_W - 1 && ay > 0 && ay < GRID_H - 1) walls.add(key(ax, ay));
-        if (bx > 0 && bx < GRID_W - 1 && by > 0 && by < GRID_H - 1) walls.add(key(bx, by));
+        if (inBounds(ax, ay)) walls.add(key(ax, ay));
+        if (inBounds(bx, by)) walls.add(key(bx, by));
       }
     }
   }
-  return {
+  return formationResult({
     name: 'Padmavyuha',
-    lore: 'The lotus formation. Arjuna and Krishna alone knew how to enter and exit fully.',
-    width: GRID_W, height: GRID_H, cellSize: CELL,
+    period: 'Day 13',
+    architect: 'Drona',
+    lore: 'The lotus formation. Petals radiate outward from a central command. In legend, only Krishna and Arjuna fully knew how to enter and exit — every other warrior who tried was caught between the petals.',
+    strategy: {
+      attackers: 'Find a petal whose tip opens outward. Push to the centre between two petals; never along their length.',
+      defenders: 'Place traps in the corridors between petals — that\'s where attackers must funnel.'
+    },
     walls,
-    entry: { x: 1, y: 1 },
+    entry: { x: 1, y: 1 + randInt(rng, 0, GRID_H - 3) },
     exit: { x: cx, y: cy },
-    suggestedTrapZones: [
-      { x: cx - 4, y: cy - 4, w: 8, h: 8 }
-    ]
-  };
+    suggestedTrapZones: [{ x: cx - 4, y: cy - 4, w: 8, h: 8 }]
+  });
 }
 
-// GARUDAVYUHA — eagle wings spread wide with a beak chokepoint at the front.
-function garudavyuha() {
+// GARUDAVYUHA — eagle wings spread wide with a beak
+function garudavyuha(seed) {
+  const rng = makeRng(seed);
   const walls = emptyWalls();
   addBorder(walls);
-  const cx = Math.floor(GRID_W / 2);
-  const cy = Math.floor(GRID_H / 2);
+  const cx = Math.floor(GRID_W / 2) + randInt(rng, -3, 3);
+  const cy = Math.floor(GRID_H / 2) + randInt(rng, -2, 2);
+  const wingSpan = randInt(rng, 12, 16);
+  const beakLen = randInt(rng, 5, 8);
+  const wingSlope = 0.4 + rng() * 0.4;
+  const mirrored = rng() > 0.5;
+  const beakDir = mirrored ? -1 : 1;
 
-  // body / spine
   for (let y = cy - 2; y <= cy + 2; y++) {
     for (let x = cx - 8; x <= cx + 8; x++) {
-      if (x === cx - 8 || x === cx + 8 || y === cy - 2 || y === cy + 2) walls.add(key(x, y));
+      if (x === cx - 8 || x === cx + 8 || y === cy - 2 || y === cy + 2) {
+        if (inBounds(x, y)) walls.add(key(x, y));
+      }
     }
   }
-  // wings sweeping back
-  for (let i = 0; i < 14; i++) {
-    walls.add(key(cx - i, cy - 2 - Math.floor(i * 0.6)));
-    walls.add(key(cx + i, cy - 2 - Math.floor(i * 0.6)));
-    walls.add(key(cx - i, cy + 2 + Math.floor(i * 0.6)));
-    walls.add(key(cx + i, cy + 2 + Math.floor(i * 0.6)));
+  for (let i = 0; i < wingSpan; i++) {
+    const drop = Math.floor(i * wingSlope);
+    [
+      [cx - i, cy - 2 - drop],
+      [cx + i, cy - 2 - drop],
+      [cx - i, cy + 2 + drop],
+      [cx + i, cy + 2 + drop]
+    ].forEach(([x, y]) => { if (inBounds(x, y)) walls.add(key(x, y)); });
   }
-  // beak chokepoint at the right
-  for (let i = 0; i < 6; i++) {
-    walls.add(key(cx + 8 + i, cy - i));
-    walls.add(key(cx + 8 + i, cy + i));
+  for (let i = 0; i < beakLen; i++) {
+    [
+      [cx + (8 + i) * beakDir, cy - i],
+      [cx + (8 + i) * beakDir, cy + i]
+    ].forEach(([x, y]) => { if (inBounds(x, y)) walls.add(key(x, y)); });
   }
-  return {
+  return formationResult({
     name: 'Garudavyuha',
-    lore: 'The eagle formation, named for Vishnu\'s mount. Wide wings, killing beak at the spearhead.',
-    width: GRID_W, height: GRID_H, cellSize: CELL,
+    period: 'Day 6',
+    architect: 'Bhishma',
+    lore: 'The eagle formation, named for Vishnu\'s mount. Wings sweep wide to envelop, the beak forms a killing chokepoint at the spear-tip. Used to overwhelm a single point and then close the wings around survivors.',
+    strategy: {
+      attackers: 'Avoid the beak — it\'s a death funnel. Try to swing wide around a wing tip.',
+      defenders: 'Trap the beak chokepoint. Anyone caught there has nowhere to run.'
+    },
     walls,
     entry: { x: 1, y: cy },
     exit: { x: GRID_W - 2, y: cy },
-    suggestedTrapZones: [
-      { x: cx + 5, y: cy - 3, w: 10, h: 6 }
-    ]
-  };
+    suggestedTrapZones: [{ x: cx + 5 * beakDir, y: cy - 3, w: 10, h: 6 }]
+  });
 }
 
-// MAKARAVYUHA — long crocodile body with a snapping head.
-function makaravyuha() {
+// MAKARAVYUHA — long crocodile body with snapping jaw
+function makaravyuha(seed) {
+  const rng = makeRng(seed);
   const walls = emptyWalls();
   addBorder(walls);
-  const cy = Math.floor(GRID_H / 2);
+  const cy = Math.floor(GRID_H / 2) + randInt(rng, -2, 2);
+  const channelHalf = randInt(rng, 3, 5);
+  const ribGap = randInt(rng, 3, 5);
+  const jawLen = randInt(rng, 5, 7);
+  const mirrored = rng() > 0.5;
 
-  // long body channel walls (top and bottom)
-  for (let x = 4; x < GRID_W - 8; x++) {
-    walls.add(key(x, cy - 4));
-    walls.add(key(x, cy + 4));
+  const left = mirrored ? GRID_W - 4 : 4;
+  const right = mirrored ? 8 : GRID_W - 8;
+  const stepDir = mirrored ? -1 : 1;
+  const xStart = Math.min(left, right), xEnd = Math.max(left, right);
+
+  for (let x = xStart; x < xEnd; x++) {
+    walls.add(key(x, cy - channelHalf));
+    walls.add(key(x, cy + channelHalf));
   }
-  // ribs
-  for (let x = 6; x < GRID_W - 10; x += 4) {
-    for (let dy = -3; dy <= 3; dy++) {
+  for (let x = xStart + 2; x < xEnd; x += ribGap) {
+    for (let dy = -channelHalf + 1; dy <= channelHalf - 1; dy++) {
       if (dy === 0) continue;
-      walls.add(key(x, cy + dy));
+      if (inBounds(x, cy + dy)) walls.add(key(x, cy + dy));
     }
   }
-  // jaw at the right
-  for (let i = 0; i < 6; i++) {
-    walls.add(key(GRID_W - 8 + i, cy - 4 - i));
-    walls.add(key(GRID_W - 8 + i, cy + 4 + i));
+  for (let i = 0; i < jawLen; i++) {
+    [
+      [right + i * stepDir, cy - channelHalf - i],
+      [right + i * stepDir, cy + channelHalf + i]
+    ].forEach(([x, y]) => { if (inBounds(x, y)) walls.add(key(x, y)); });
   }
-  return {
+  return formationResult({
     name: 'Makaravyuha',
-    lore: 'The crocodile formation. Long, narrow, with a crushing jaw at the head.',
-    width: GRID_W, height: GRID_H, cellSize: CELL,
+    period: 'Day 8',
+    architect: 'Bhishma',
+    lore: 'The crocodile formation. A long, narrow corridor of warriors with a crushing jaw at the head. Designed to channel the enemy into a tight kill-zone.',
+    strategy: {
+      attackers: 'Speed through the body — don\'t linger between the ribs. The jaw closes fast.',
+      defenders: 'Place traps in the rib gaps and inside the jaw. The corridor leaves nowhere to dodge.'
+    },
     walls,
-    entry: { x: 1, y: cy },
-    exit: { x: GRID_W - 2, y: cy },
+    entry: mirrored ? { x: GRID_W - 2, y: cy } : { x: 1, y: cy },
+    exit: mirrored ? { x: 1, y: cy } : { x: GRID_W - 2, y: cy },
     suggestedTrapZones: [
-      { x: GRID_W - 14, y: cy - 3, w: 8, h: 6 }
+      mirrored
+        ? { x: 6, y: cy - 3, w: 8, h: 6 }
+        : { x: GRID_W - 14, y: cy - 3, w: 8, h: 6 }
     ]
-  };
+  });
 }
 
-const VYUHAS = {
-  chakravyuha,
-  padmavyuha,
-  garudavyuha,
-  makaravyuha
-};
+// FREE BUILD — empty arena, defenders design the maze themselves
+function freebuild(seed) {
+  const walls = emptyWalls();
+  addBorder(walls);
+  return formationResult({
+    name: 'Free Build',
+    period: 'Custom',
+    architect: 'You',
+    lore: 'No formation laid down by ancients. The defending team designs the field from scratch — every wall and every trap is theirs to place. Use the extended setup phase to craft a deathtrap of your own making.',
+    strategy: {
+      attackers: 'You are walking into someone\'s imagination. Expect anything.',
+      defenders: 'Place walls to funnel attackers, then traps to punish where they must walk. You have 90 seconds.'
+    },
+    walls,
+    entry: { x: 1, y: Math.floor(GRID_H / 2) },
+    exit: { x: GRID_W - 2, y: Math.floor(GRID_H / 2) },
+    suggestedTrapZones: []
+  });
+}
 
-function generate(name) {
+function pickEntry(side, cy, cx) {
+  switch (side) {
+    case 0: return { x: 1, y: cy };
+    case 1: return { x: GRID_W - 2, y: cy };
+    case 2: return { x: cx, y: 1 };
+    default: return { x: cx, y: GRID_H - 2 };
+  }
+}
+
+const VYUHAS = { chakravyuha, padmavyuha, garudavyuha, makaravyuha, freebuild };
+
+function generate(name, seed) {
   const fn = VYUHAS[name];
   if (!fn) throw new Error('Unknown vyuha: ' + name);
-  const v = fn();
-  // Convert Set to Array for transmission
-  return { ...v, walls: Array.from(v.walls) };
+  const s = (seed === undefined) ? (Date.now() & 0xffffffff) : seed;
+  const v = fn(s);
+  return { ...v, walls: Array.from(v.walls), seed: s };
 }
 
-function isWalkable(walls, x, y) {
-  return !walls.has(key(x, y));
-}
+function isWalkable(walls, x, y) { return !walls.has(key(x, y)); }
 
 module.exports = { VYUHAS, generate, isWalkable, key, CELL, GRID_W, GRID_H };

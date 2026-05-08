@@ -104,6 +104,26 @@ function setLobbyMode(mode) {
   $('#manual-select').classList.toggle('hidden', mode !== 'manual');
 }
 
+// ----------------- maze-style toggle (classical vs free-build) -----------------
+$$('.maze-btn').forEach(b => b.addEventListener('click', () => {
+  socket?.emit('setMazeMode', { mode: b.dataset.maze });
+}));
+function setMazeModeUI(mode) {
+  $$('.maze-btn').forEach(b => b.classList.toggle('active', b.dataset.maze === mode));
+}
+
+// ----------------- music toggle -----------------
+$('#btnMusic')?.addEventListener('click', async () => {
+  if (!window.Music) return;
+  if (!window.Music.isStarted()) {
+    await window.Music.start();
+    $('#btnMusic').textContent = '🎵 On';
+  } else {
+    window.Music.toggleMute();
+    $('#btnMusic').textContent = window.Music.isMuted() ? '🔈 Music' : '🎵 On';
+  }
+});
+
 // auto-lobby ready button
 $('#btnReadyAuto').addEventListener('click', () => {
   const me = lastSnap?.players.find(p => p.socketId === mySocketId);
@@ -259,11 +279,22 @@ canvas.addEventListener('mousemove', (e) => {
   }
 });
 canvas.addEventListener('mousedown', (e) => {
+  // setup-phase tile-edit takes priority over combat clicks
+  if (lastSnap?.phase === 'setup' && setupHover) {
+    const isFree = lastSnap.mazeMode === 'freebuild';
+    if (e.button === 0) {
+      if (isFree && (e.shiftKey || e.altKey)) {
+        socket?.emit('toggleWall', { x: setupHover.x, y: setupHover.y });
+      } else {
+        socket?.emit('placeTrap', { x: setupHover.x, y: setupHover.y });
+      }
+    } else if (e.button === 2 && isFree) {
+      socket?.emit('toggleWall', { x: setupHover.x, y: setupHover.y });
+    }
+    return; // don't also send attack/ability while sculpting
+  }
   if (e.button === 0) input.attack = true;
   if (e.button === 2) input.ability = true;
-  if (lastSnap?.phase === 'setup' && setupHover) {
-    socket?.emit('placeTrap', { x: setupHover.x, y: setupHover.y });
-  }
 });
 canvas.addEventListener('mouseup', (e) => {
   if (e.button === 0) input.attack = false;
@@ -300,6 +331,16 @@ function onSnapshot(snap) {
       }
     }
   }
+  // briefing card: only when we ENTER setup (and have maze info)
+  if (snap.phase === 'setup' && (!lastSnap || lastSnap.phase !== 'setup') && snap.maze) {
+    showBriefing(snap.maze);
+  }
+  // music phase
+  if (window.Music && (!lastSnap || lastSnap.phase !== snap.phase)) {
+    window.Music.setPhase(snap.phase);
+  }
+  // maze mode UI
+  if (snap.mazeMode) setMazeModeUI(snap.mazeMode);
   lastSnap = snap;
   if (window.Voice) window.Voice.onSnapshot(snap);
   updateVoiceChannelLabel(snap);
@@ -730,6 +771,30 @@ function drawVignette(W, H) {
 
 // helper that's called from world-space; left as no-op (already drawn inside drawSpecialTiles)
 function drawSetupHelpers() {}
+
+// =========================================================
+//  Pre-round vyuha briefing
+// =========================================================
+let briefingTimer = null;
+function showBriefing(maze) {
+  const el = $('#briefing');
+  if (!el || !maze) return;
+  el.querySelector('.briefing-period').textContent = maze.period || '';
+  el.querySelector('.briefing-name').textContent = maze.name || '';
+  el.querySelector('.briefing-architect').textContent = maze.architect ? `Devised by ${maze.architect}` : '';
+  el.querySelector('.briefing-lore').textContent = maze.lore || '';
+  el.querySelector('.strat-att').textContent = maze.strategy?.attackers || '';
+  el.querySelector('.strat-def').textContent = maze.strategy?.defenders || '';
+  el.classList.remove('hidden');
+  if (briefingTimer) clearTimeout(briefingTimer);
+  briefingTimer = setTimeout(() => el.classList.add('hidden'), 8000);
+}
+document.addEventListener('click', (e) => {
+  if (e.target.matches('.briefing-dismiss') || e.target.id === 'briefing') {
+    $('#briefing').classList.add('hidden');
+    if (briefingTimer) { clearTimeout(briefingTimer); briefingTimer = null; }
+  }
+});
 
 // ----------------- helpers -----------------
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }

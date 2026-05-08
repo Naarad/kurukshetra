@@ -6,7 +6,8 @@ const { generate, key, CELL, GRID_W, GRID_H } = require('./vyuhas');
 const { makeBotId, pickBotName, simulateBot } = require('./bot');
 
 const TICK_MS = 1000 / 30;
-const SETUP_MS = 60_000;        // 60s to place traps
+const SETUP_MS = 60_000;        // 60s to place traps in classical mode
+const SETUP_MS_FREE = 90_000;   // 90s when defenders also design the maze
 const ROUND_MS = 180_000;       // 3 min max per round
 const ROUNDS_TO_WIN = 3;        // best of 5
 
@@ -29,6 +30,13 @@ class Match {
     this.lastInputs = new Map(); // socketId -> {up,down,left,right,facing,attack,ability,astra}
     this.events = [];            // small toast queue
     this.assignmentMode = 'auto'; // 'auto' | 'manual'
+    this.mazeMode = 'classical';  // 'classical' | 'freebuild'
+  }
+
+  setMazeMode(mode) {
+    if (this.phase !== 'lobby') return;
+    if (mode !== 'classical' && mode !== 'freebuild') return;
+    this.mazeMode = mode;
   }
 
   setAssignmentMode(mode) {
@@ -201,10 +209,15 @@ class Match {
     this.round++;
     this.projectiles = [];
     this.traps = [];
-    // pick a vyuha (cycle through)
-    const vyuhaList = ['chakravyuha', 'padmavyuha', 'garudavyuha', 'makaravyuha'];
-    const vyuhaName = vyuhaList[(this.round - 1) % vyuhaList.length];
-    const v = generate(vyuhaName);
+    // pick a vyuha (free build, or cycle through the classical four)
+    let vyuhaName;
+    if (this.mazeMode === 'freebuild') {
+      vyuhaName = 'freebuild';
+    } else {
+      const vyuhaList = ['chakravyuha', 'padmavyuha', 'garudavyuha', 'makaravyuha'];
+      vyuhaName = vyuhaList[(this.round - 1) % vyuhaList.length];
+    }
+    const v = generate(vyuhaName); // each call gets a fresh seed → new layout
     this.maze = v;
     this.wallSet = new Set(v.walls);
 
@@ -219,8 +232,13 @@ class Match {
     }
 
     this.phase = 'setup';
-    this.phaseEndsAt = Date.now() + SETUP_MS;
-    this.pushEvent(`Round ${this.round}: ${this.maze.name}. ${capitalize(this.defendingTeam)} place traps.`);
+    const setupDur = this.mazeMode === 'freebuild' ? SETUP_MS_FREE : SETUP_MS;
+    this.phaseEndsAt = Date.now() + setupDur;
+    if (this.mazeMode === 'freebuild') {
+      this.pushEvent(`Round ${this.round}: Free Build. ${capitalize(this.defendingTeam)} draw the maze (${setupDur / 1000}s).`);
+    } else {
+      this.pushEvent(`Round ${this.round}: ${this.maze.name}. ${capitalize(this.defendingTeam)} place traps.`);
+    }
   }
 
   startBreakPhase() {
@@ -288,6 +306,28 @@ class Match {
     if (this.traps.filter(t => t.owner === socketId).length >= 4) return;
     if (tileX < 1 || tileY < 1 || tileX >= GRID_W - 1 || tileY >= GRID_H - 1) return;
     this.traps.push({ x: tileX, y: tileY, owner: socketId, team: p.team, kind, armed: true });
+  }
+
+  // Free-build only: defenders may add or remove walls during setup.
+  toggleWall(socketId, tileX, tileY) {
+    if (this.phase !== 'setup') return;
+    if (this.mazeMode !== 'freebuild') return;
+    const p = this.players.get(socketId);
+    if (!p || p.team !== this.defendingTeam) return;
+    if (tileX < 1 || tileY < 1 || tileX >= GRID_W - 1 || tileY >= GRID_H - 1) return;
+    // protect entry & exit
+    if ((tileX === this.maze.entry.x && tileY === this.maze.entry.y) ||
+        (tileX === this.maze.exit.x && tileY === this.maze.exit.y)) return;
+    const k = key(tileX, tileY);
+    if (this.wallSet.has(k)) {
+      this.wallSet.delete(k);
+      this.maze.walls = this.maze.walls.filter(w => w !== k);
+    } else {
+      this.wallSet.add(k);
+      this.maze.walls.push(k);
+      // remove any trap on that tile
+      this.traps = this.traps.filter(t => !(t.x === tileX && t.y === tileY));
+    }
   }
 
   // -------- tick --------
@@ -784,9 +824,13 @@ class Match {
       defendingTeam: this.defendingTeam,
       phaseEndsAt: this.phaseEndsAt,
       assignmentMode: this.assignmentMode,
+      mazeMode: this.mazeMode,
       maze: this.maze ? {
         name: this.maze.name,
         lore: this.maze.lore,
+        period: this.maze.period,
+        architect: this.maze.architect,
+        strategy: this.maze.strategy,
         width: this.maze.width, height: this.maze.height, cellSize: this.maze.cellSize,
         walls: Array.from(this.wallSet),
         entry: this.maze.entry, exit: this.maze.exit,

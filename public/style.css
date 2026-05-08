@@ -626,16 +626,216 @@ body.is-mobile #game { height: 60vh; min-height: 360px; }
 body.is-mobile .sidebar { max-height: 30vh; overflow: auto; }
 
 /* =========================================================
-   Responsive
+   Maze-mode toggle
+   ========================================================= */
+.maze-toggle .maze-btn {
+  background: transparent; color: var(--ink-dim); border: none;
+  padding: 6px 12px; font-size: 12px; font-weight: 700; letter-spacing: .5px;
+  border-radius: 6px; box-shadow: none;
+}
+.maze-toggle .maze-btn.active {
+  background: linear-gradient(180deg, #c0392b, #6e1f15);
+  color: #fff; box-shadow: 0 1px 0 #2a0808;
+}
+
+/* =========================================================
+   Pre-round briefing
+   ========================================================= */
+.briefing {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(0,0,0,.85);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px);
+  animation: overlayIn .35s ease;
+  padding: 20px;
+}
+.briefing-card {
+  background: linear-gradient(180deg, #1a120a, #0a0604);
+  border: 1px solid var(--gold-deep); border-radius: 14px;
+  padding: 28px 36px;
+  max-width: 600px; max-height: 90vh; overflow: auto;
+  position: relative;
+  box-shadow: 0 0 80px rgba(245,215,110,.25), var(--shadow-1);
+}
+.briefing-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.briefing-period {
+  font-size: 11px; letter-spacing: 3px; color: var(--accent);
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.briefing-name {
+  margin: 0 0 4px; color: var(--gold); font-size: 32px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(245,215,110,.3);
+}
+.briefing-architect { color: var(--ink-dim); font-style: italic; margin-bottom: 14px; font-size: 13px; }
+.briefing-lore {
+  color: var(--ink); line-height: 1.6; font-size: 14px; margin-bottom: 16px;
+  border-left: 3px solid var(--accent); padding-left: 12px;
+}
+.briefing-strategy {
+  background: rgba(0,0,0,.4); border: 1px solid #3a2a14; border-radius: 8px;
+  padding: 12px 14px;
+}
+.briefing-strategy > div { font-size: 13px; color: var(--ink-dim); padding: 4px 0; line-height: 1.5; }
+.briefing-strategy b { color: var(--gold); }
+
+/* =========================================================
+   Responsive — desktop
    ========================================================= */
 @media (max-width: 1100px) {
   .arena-wrap { grid-template-columns: 1fr 240px; }
 }
-@media (max-width: 900px) {
-  .arena-wrap { grid-template-columns: 1fr; }
-  .select-grid { grid-template-columns: 1fr; }
-  .rules-card { padding: 24px; }
-  .hud { flex-wrap: wrap; gap: 8px; }
-  .hud-actions { flex-wrap: wrap; }
-  .mode-toggle { font-size: 11px; }
+
+/* =========================================================
+   MOBILE — phones + small tablets (≤768px)
+   The whole layout flips to a single column. Everything
+   that was a sidebar becomes a drawer. Touch targets ≥44px.
+   ========================================================= */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+  .screen { padding: 8px; }
+
+  /* HUD: stack on a single line, tighter padding */
+  .hud {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 10px;
+  }
+  .brand { font-size: 14px; flex: 1; }
+  .brand .room { font-size: 11px; }
+  .hud-actions { flex-wrap: wrap; gap: 4px; width: 100%; }
+  .hud-right { flex-wrap: wrap; gap: 6px; }
+  .mode-toggle, .maze-toggle { width: 100%; justify-content: center; }
+  .mode-btn, .maze-btn { padding: 8px 10px !important; font-size: 11px !important; flex: 1; }
+  button.ghost { padding: 8px 12px; font-size: 12px; }
+
+  /* JOIN screen */
+  .card { margin: 24px auto; padding: 24px; }
+  .card h1 { font-size: 32px; letter-spacing: 2px; }
+  .om-mark { font-size: 44px; }
+  input { padding: 12px; font-size: 16px; /* prevents iOS zoom */ }
+  .card button { padding: 14px; font-size: 15px; }
+
+  /* AUTO LOBBY */
+  .auto-explainer { padding: 16px 18px; }
+  .auto-explainer h2 { font-size: 20px; letter-spacing: 1px; }
+  .auto-explainer p { font-size: 13px; }
+  .player-bench {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px;
+    min-height: 120px;
+  }
+  .player-tile { padding: 10px; gap: 8px; }
+  .player-tile .avatar { width: 36px; height: 36px; font-size: 16px; }
+  .player-tile .name { font-size: 13px; }
+  .player-tile .status { font-size: 10px; }
+  .ready-bar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .ready-bar button { width: 100%; padding: 12px; font-size: 14px; }
+  .ready-summary { font-size: 12px; width: 100%; }
+
+  /* MANUAL select grid: stack teams vertically, two-col cards */
+  .select-grid { grid-template-columns: 1fr; gap: 12px; }
+  .roster { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .char-card { padding: 8px; }
+  .char-card h3 { font-size: 14px; }
+  .char-card .ab, .char-card .astra { font-size: 10px; }
+  .team-banner { padding: 10px; }
+  .team-banner h2 { font-size: 18px; }
+  .motto { font-size: 11px; }
+
+  /* ARENA: canvas fills width, sidebar collapses to a horizontal strip on top */
+  .arena-wrap {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding-bottom: 200px; /* leave room for joysticks */
+  }
+  #game {
+    height: 50vh;
+    min-height: 320px;
+    max-height: 60vh;
+  }
+  .sidebar {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: 130px;
+    gap: 6px;
+    padding: 4px;
+    scrollbar-width: thin;
+  }
+  .me-card, .abilities, .events, .legend {
+    flex: 0 0 auto;
+    min-width: 180px;
+    padding: 8px;
+  }
+  .me-card .name { font-size: 14px; }
+  .me-card .title { font-size: 10px; }
+  .events { max-height: 110px; min-height: 80px; min-width: 200px; font-size: 10px; }
+  .legend { display: none; }
+  .ab-row { font-size: 11px; padding: 3px 0; }
+  .ab-row .key { width: 22px; font-size: 9px; }
+
+  .phase-banner { font-size: 12px; }
+  .score { font-size: 14px; }
+
+  /* RULES MODAL */
+  .rules-modal { padding: 8px; }
+  .rules-card {
+    padding: 18px 16px;
+    max-height: 92vh;
+    border-radius: 12px;
+  }
+  .rules-card h2 { font-size: 22px; letter-spacing: 1px; }
+  .rules-card h3 { font-size: 14px; }
+  .rules-card .lead { font-size: 13px; }
+  table.ctrl th { width: 100px; font-size: 12px; }
+  table.ctrl td { font-size: 12px; }
+
+  /* BRIEFING */
+  .briefing-card { padding: 20px 18px; }
+  .briefing-name { font-size: 24px; }
+  .briefing-lore { font-size: 13px; }
+  .briefing-strategy > div { font-size: 12px; }
+
+  /* VOICE BAR */
+  .voice-bar {
+    bottom: 6px; padding: 4px 10px; gap: 6px;
+    flex-wrap: wrap;
+    max-width: calc(100vw - 20px);
+  }
+  .voice-btn { padding: 6px 10px; font-size: 12px; }
+  .voice-channel { font-size: 10px; }
+
+  /* MOBILE TOUCH CONTROLS */
+  .touch-zone { width: 130px; height: 130px; bottom: 12px; }
+  .touch-move { left: 10px; }
+  .touch-aim { right: 10px; }
+  .stick-knob { width: 50px; height: 50px; margin-left: -25px; margin-top: -25px; }
+  .touch-buttons { bottom: 150px; right: 10px; gap: 8px; }
+  .tbtn { width: 56px; height: 56px; font-size: 16px; }
+
+  /* OVERLAY (round-over) */
+  .overlay .panel { padding: 22px 24px; max-width: 92vw; }
+  .overlay h2 { font-size: 22px; letter-spacing: 1px; }
+}
+
+/* Even smaller phones */
+@media (max-width: 380px) {
+  .roster { grid-template-columns: 1fr; }
+  .player-bench { grid-template-columns: 1fr; }
+  .touch-zone { width: 110px; height: 110px; }
+  .tbtn { width: 50px; height: 50px; }
+}
+
+/* Landscape phones — squeeze the canvas taller */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  body.is-mobile #game { height: 75vh; }
+  body.is-mobile .arena-wrap { padding-bottom: 160px; }
+  .touch-zone { width: 110px; height: 110px; bottom: 8px; }
+  .touch-buttons { bottom: 130px; }
+  .voice-bar { display: none; } /* save room — toggle via button later */
 }
