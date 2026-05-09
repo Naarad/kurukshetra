@@ -1,163 +1,259 @@
 // =========================================================
-// Kurukshetra character portraits — procedurally drawn SVG.
-// Each character has distinctive features (skin tone, hair,
-// beard, headwear, motif). No external image assets needed.
+// Kurukshetra character emblems — medallion / seal style SVG.
+// Each character is represented by an iconic glyph centered on
+// a gold-trimmed coin in their team / signature color. No faces
+// — just clean, thematic, instantly recognizable badges.
 // Exposes window.Portraits.svg(charKey, opts) → string of SVG.
 // =========================================================
 (function () {
-  // skin: bronze / fair / dark / blue (Krishna)
-  // hair: black / white / grey / brown
-  // headwear: crown, peacock-feather, helmet, hood, headband, none
-  // motif: mace, bow, daggers, dice, chakra, none
-  const TRAITS = {
-    krishna:      { skin: '#2c5fa8', hair: '#000', beard: false, hat: 'peacock', motif: 'flute',  bg: '#143a6a' },
-    yudhishthira: { skin: '#d2a878', hair: '#1a1108', beard: true,  hat: 'crown',    motif: 'staff',  bg: '#5e3e10' },
-    bhima:        { skin: '#9c5e2b', hair: '#000',    beard: true,  hat: 'none',     motif: 'mace',   bg: '#5a1f12' },
-    arjuna:       { skin: '#c89868', hair: '#000',    beard: false, hat: 'headband', motif: 'bow',    bg: '#1f4673' },
-    nakula:       { skin: '#d8b288', hair: '#000',    beard: false, hat: 'circlet',  motif: 'dagger', bg: '#0f5f48' },
-    sahadeva:     { skin: '#c8a070', hair: '#000',    beard: false, hat: 'circlet',  motif: 'scroll', bg: '#3a1f5a' },
-    bhishma:      { skin: '#cfb89a', hair: '#e8e8e8', beard: true,  hat: 'crown',    motif: 'bow',    bg: '#4a4a4a' },
-    duryodhana:   { skin: '#a86840', hair: '#000',    beard: true,  hat: 'crown',    motif: 'mace',   bg: '#3e1640' },
-    dushasana:    { skin: '#a85a30', hair: '#000',    beard: true,  hat: 'none',     motif: 'mace',   bg: '#5e2410' },
-    karna:        { skin: '#d49a52', hair: '#3a1a08', beard: false, hat: 'helmet',   motif: 'bow',    bg: '#7a3a08' },
-    ashwatthama:  { skin: '#bfa176', hair: '#1a1108', beard: false, hat: 'gem',      motif: 'sword',  bg: '#1a4a3a' },
-    shakuni:      { skin: '#a8845a', hair: '#5a4a30', beard: true,  hat: 'hood',     motif: 'dice',   bg: '#3a3a3a' }
+  const CHAR = {
+    krishna:      { color: '#1f6feb', accent: '#ffd86e', glyph: 'chakra',     letter: 'क' },
+    yudhishthira: { color: '#7a5208', accent: '#ffd86e', glyph: 'crown',      letter: 'य' },
+    bhima:        { color: '#8a1c1c', accent: '#ffd86e', glyph: 'mace',       letter: 'भ' },
+    arjuna:       { color: '#1f4673', accent: '#ffd86e', glyph: 'bow',        letter: 'अ' },
+    nakula:       { color: '#0e7a5a', accent: '#ffd86e', glyph: 'twin',       letter: 'न' },
+    sahadeva:     { color: '#5a2a8a', accent: '#ffd86e', glyph: 'scroll',     letter: 'स' },
+    bhishma:      { color: '#5a5a5a', accent: '#e8e8e8', glyph: 'arrow_bed',  letter: 'भी' },
+    duryodhana:   { color: '#3e1640', accent: '#c0392b', glyph: 'mace',       letter: 'दु' },
+    dushasana:    { color: '#5e2410', accent: '#c0392b', glyph: 'flame',      letter: 'दु' },
+    karna:        { color: '#a36210', accent: '#ffd86e', glyph: 'sun',        letter: 'क' },
+    ashwatthama:  { color: '#0e6a4a', accent: '#5dd4ad', glyph: 'gem',        letter: 'अ' },
+    shakuni:      { color: '#3a3a3a', accent: '#cccccc', glyph: 'dice',       letter: 'श' }
   };
 
+  // Team colors used for outer ring fallback when no ring is requested
+  const TEAM_RING = { pandava: '#5a8cff', kaurava: '#ff6b58' };
+
   function svg(charKey, opts = {}) {
-    const t = TRAITS[charKey] || TRAITS.arjuna;
+    const c = CHAR[charKey] || CHAR.arjuna;
     const size = opts.size || 64;
-    const showBg = opts.bg !== false;
-    const ring = opts.ring || null; // optional ring color (team accent)
+    const ring = opts.ring || null;
+    const id = 'p_' + charKey + '_' + Math.floor(Math.random() * 1e6);
     return `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet" aria-label="${charKey}">
-  ${showBg ? bg(t.bg, ring) : ''}
-  <!-- shoulders -->
-  <path d="M6 60 Q12 44 22 42 H42 Q52 44 58 60 Z" fill="${shoulderColor(t)}" />
-  <path d="M22 42 Q24 48 32 50 Q40 48 42 42 Z" fill="${shadow(t.skin)}" />
-  <!-- neck -->
-  <rect x="28" y="38" width="8" height="6" rx="2" fill="${t.skin}" />
-  <!-- head -->
-  <ellipse cx="32" cy="28" rx="11" ry="13" fill="${t.skin}" />
-  <!-- ear -->
-  <ellipse cx="20" cy="28" rx="2" ry="3" fill="${shadow(t.skin)}" />
-  <ellipse cx="44" cy="28" rx="2" ry="3" fill="${shadow(t.skin)}" />
-  <!-- hair shadow on forehead, behind hat -->
-  ${hairTop(t)}
-  <!-- eyes -->
-  <ellipse cx="27" cy="28" rx="1.2" ry="1.6" fill="#1a0a04"/>
-  <ellipse cx="37" cy="28" rx="1.2" ry="1.6" fill="#1a0a04"/>
-  <!-- brow -->
-  <path d="M24 24 Q27 22 30 24" stroke="${t.hair}" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-  <path d="M34 24 Q37 22 40 24" stroke="${t.hair}" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-  <!-- nose -->
-  <path d="M32 28 Q31 32 32 34 Q33 33 32 32" stroke="${shadow(t.skin)}" stroke-width="1" fill="none"/>
-  <!-- mouth -->
-  <path d="M28 36 Q32 38 36 36" stroke="#3a1a0c" stroke-width="1" fill="none" stroke-linecap="round"/>
-  ${t.beard ? beard(t) : ''}
-  <!-- tilak (forehead mark) on most -->
-  ${tilak(charKey, t)}
-  <!-- headwear -->
-  ${headwear(t)}
-  <!-- motif badge bottom-corner -->
-  ${motif(t)}
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <radialGradient id="g_${id}" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="${lighten(c.color, 0.45)}"/>
+      <stop offset="60%" stop-color="${c.color}"/>
+      <stop offset="100%" stop-color="${darken(c.color, 0.55)}"/>
+    </radialGradient>
+    <linearGradient id="gold_${id}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe294"/>
+      <stop offset="50%" stop-color="#d6a23f"/>
+      <stop offset="100%" stop-color="#7a5208"/>
+    </linearGradient>
+  </defs>
+  <!-- outer team ring -->
+  <circle cx="32" cy="32" r="31.5" fill="${ring || '#1a0e04'}" />
+  <!-- outer gold rim -->
+  <circle cx="32" cy="32" r="29" fill="url(#gold_${id})" />
+  <!-- inner shadow rim -->
+  <circle cx="32" cy="32" r="26.5" fill="${darken(c.color, 0.7)}" />
+  <!-- center field -->
+  <circle cx="32" cy="32" r="25" fill="url(#g_${id})" />
+  <!-- ornamental dots around the rim -->
+  ${ornamentDots(c.accent)}
+  <!-- main glyph -->
+  <g transform="translate(32 32)">
+    ${glyphFor(c.glyph, c.accent)}
+  </g>
+  <!-- top highlight -->
+  <ellipse cx="32" cy="14" rx="14" ry="3" fill="#ffffff" opacity="0.18"/>
+  <!-- corner letter chip -->
+  <g transform="translate(50 50)">
+    <circle r="9" fill="${darken(c.color, 0.6)}" stroke="${c.accent}" stroke-width="1"/>
+    <text y="3.5" text-anchor="middle" font-family="serif" font-size="10" font-weight="700" fill="${c.accent}">${c.letter}</text>
+  </g>
 </svg>`.trim();
   }
 
-  function bg(color, ring) {
-    const stop1 = lighten(color, 0.25);
-    const stop2 = darken(color, 0.4);
+  function ornamentDots(color) {
+    let s = '';
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+      const x = 32 + Math.cos(a) * 27.7;
+      const y = 32 + Math.sin(a) * 27.7;
+      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="0.9" fill="${color}" opacity="0.85"/>`;
+    }
+    return s;
+  }
+
+  // ---- glyphs (drawn around origin in a 40×40 box, scaled appropriately) ----
+  function glyphFor(name, accent) {
+    switch (name) {
+      case 'chakra':
+        return chakra(accent);
+      case 'crown':
+        return crown(accent);
+      case 'mace':
+        return mace(accent);
+      case 'bow':
+        return bow(accent);
+      case 'twin':
+        return twin(accent);
+      case 'scroll':
+        return scroll(accent);
+      case 'arrow_bed':
+        return arrowBed(accent);
+      case 'flame':
+        return flame(accent);
+      case 'sun':
+        return sun(accent);
+      case 'gem':
+        return gem(accent);
+      case 'dice':
+        return dice(accent);
+      default:
+        return '';
+    }
+  }
+
+  function chakra(c) {
+    // 8-spoke chakra, classic Krishna's Sudarshan
+    let spokes = '';
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const x1 = Math.cos(a) * 4, y1 = Math.sin(a) * 4;
+      const x2 = Math.cos(a) * 14, y2 = Math.sin(a) * 14;
+      spokes += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/>`;
+    }
+    let teeth = '';
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const x1 = Math.cos(a) * 14;
+      const y1 = Math.sin(a) * 14;
+      const x2 = Math.cos(a) * 16;
+      const y2 = Math.sin(a) * 16;
+      teeth += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+    }
     return `
-<defs>
-  <radialGradient id="bgg" cx="50%" cy="35%" r="80%">
-    <stop offset="0" stop-color="${stop1}"/>
-    <stop offset="1" stop-color="${stop2}"/>
-  </radialGradient>
-</defs>
-<circle cx="32" cy="32" r="32" fill="url(#bgg)"/>
-${ring ? `<circle cx="32" cy="32" r="30.5" fill="none" stroke="${ring}" stroke-width="2"/>` : ''}
-`;
+${teeth}
+<circle r="14" fill="none" stroke="${c}" stroke-width="2"/>
+${spokes}
+<circle r="3.5" fill="${c}"/>
+<circle r="1.4" fill="#1a0a04"/>`;
   }
 
-  function shoulderColor(t) {
-    // armored upper-body in a darkened skin or armor color
-    return darken(t.skin, 0.55);
-  }
-
-  function hairTop(t) {
-    // hair fringe under headwear
-    if (t.hat === 'none' || t.hat === 'headband' || t.hat === 'circlet' || t.hat === 'gem') {
-      return `<path d="M21 22 Q24 16 32 16 Q40 16 43 22 Q40 18 32 19 Q24 18 21 22 Z" fill="${t.hair}"/>`;
-    }
-    return `<path d="M22 22 Q24 18 32 18 Q40 18 42 22 Z" fill="${t.hair}" opacity="0.85"/>`;
-  }
-
-  function beard(t) {
+  function crown(c) {
     return `
-<path d="M24 36 Q24 44 32 47 Q40 44 40 36 Q38 41 32 42 Q26 41 24 36 Z" fill="${t.hair}"/>
-<path d="M28 39 Q30 44 32 44 Q34 44 36 39" stroke="${darken(t.hair, 0.3)}" stroke-width="0.6" fill="none"/>`;
+<path d="M-15 6 L-12 -10 L-6 -2 L0 -14 L6 -2 L12 -10 L15 6 Z"
+      fill="${c}" stroke="#1a0a04" stroke-width="1.2"/>
+<rect x="-15" y="6" width="30" height="3" fill="${c}" stroke="#1a0a04" stroke-width="1"/>
+<circle cx="0" cy="-9" r="2" fill="#c0392b" stroke="#1a0a04" stroke-width="0.6"/>
+<circle cx="-12" cy="-7" r="1.4" fill="#fff" opacity="0.7"/>
+<circle cx="12" cy="-7" r="1.4" fill="#fff" opacity="0.7"/>`;
   }
 
-  function tilak(key, t) {
-    if (key === 'shakuni' || key === 'duryodhana' || key === 'dushasana') return '';
-    const color = key === 'krishna' ? '#fbe23a' : '#c0392b';
-    return `<rect x="31.2" y="18" width="1.6" height="4.5" rx="0.6" fill="${color}"/>`;
+  function mace(c) {
+    return `
+<rect x="-1.6" y="-2" width="3.2" height="18" fill="${c}" stroke="#1a0a04" stroke-width="0.8"/>
+<rect x="-3" y="14" width="6" height="2.5" fill="${c}" stroke="#1a0a04" stroke-width="0.8"/>
+<g transform="translate(0 -7)">
+  <circle r="9" fill="${c}" stroke="#1a0a04" stroke-width="1.2"/>
+  <circle r="6" fill="none" stroke="#1a0a04" stroke-width="0.6"/>
+  ${spikes(8, 9, 12, c)}
+</g>`;
   }
-
-  function headwear(t) {
-    switch (t.hat) {
-      case 'crown': return `
-<path d="M20 18 L24 8 L28 16 L32 6 L36 16 L40 8 L44 18 Z" fill="#f5d76e" stroke="#7a5208" stroke-width="0.6"/>
-<rect x="20" y="17" width="24" height="3" fill="#b58610"/>
-<circle cx="32" cy="11" r="1.4" fill="#c0392b"/>`;
-      case 'peacock': return `
-<!-- forehead band -->
-<rect x="20" y="17" width="24" height="3" rx="1" fill="#fbe23a"/>
-<!-- peacock feather -->
-<path d="M44 16 Q52 6 50 0 Q48 6 46 12" fill="#1f8a5a"/>
-<ellipse cx="49" cy="6" rx="2.2" ry="3.4" fill="#2c5fa8"/>
-<ellipse cx="49" cy="6" rx="1" ry="1.8" fill="#fbe23a"/>
-<ellipse cx="49" cy="6" rx="0.4" ry="0.8" fill="#1a0a04"/>`;
-      case 'helmet': return `
-<path d="M20 20 Q22 8 32 8 Q42 8 44 20 L42 22 H22 Z" fill="#8b6f3a" stroke="#3a2a08" stroke-width="0.6"/>
-<rect x="22" y="20" width="20" height="3" fill="#b58610"/>
-<circle cx="32" cy="12" r="2" fill="#fbe23a"/>
-<rect x="31" y="8" width="2" height="8" fill="#fbe23a"/>`;
-      case 'headband': return `
-<rect x="20" y="20" width="24" height="3" rx="1" fill="#1f4673"/>
-<path d="M20 22 L18 18 L16 24" fill="#1f4673"/>`;
-      case 'circlet': return `
-<rect x="22" y="20" width="20" height="2" rx="1" fill="#b58610"/>
-<circle cx="32" cy="20" r="1.4" fill="#f5d76e"/>`;
-      case 'hood': return `
-<path d="M14 20 Q14 6 32 6 Q50 6 50 20 L46 22 Q44 16 32 16 Q20 16 18 22 Z" fill="#3a3022"/>
-<path d="M16 20 Q16 8 32 8 Q48 8 48 20" fill="none" stroke="#1a1408" stroke-width="0.8"/>`;
-      case 'gem': return `
-<rect x="20" y="20" width="24" height="3" rx="1" fill="#1a4a3a"/>
-<path d="M30 16 L32 12 L34 16 L32 18 Z" fill="#5dd4ad" stroke="#2a6048" stroke-width="0.5"/>
-<path d="M32 12 L32 18" stroke="#fff" stroke-width="0.5" opacity="0.7"/>`;
-      case 'none':
-      default: return '';
+  function spikes(count, r1, r2, color) {
+    let s = '';
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const x1 = Math.cos(a) * r1, y1 = Math.sin(a) * r1;
+      const x2 = Math.cos(a) * r2, y2 = Math.sin(a) * r2;
+      s += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`;
     }
+    return s;
   }
 
-  function motif(t) {
-    // small motif badge bottom-right
-    const cx = 53, cy = 53, r = 7;
-    let inner = '';
-    switch (t.motif) {
-      case 'mace':   inner = `<circle cx="${cx + 1}" cy="${cy - 2}" r="3" fill="#5a3014"/><rect x="${cx - 0.5}" y="${cy - 1}" width="1" height="6" fill="#7a4a1a"/>`; break;
-      case 'bow':    inner = `<path d="M${cx - 3} ${cy - 3} Q${cx + 4} ${cy} ${cx - 3} ${cy + 3}" stroke="#7a4a1a" stroke-width="1.2" fill="none"/><line x1="${cx - 3}" y1="${cy - 3}" x2="${cx - 3}" y2="${cy + 3}" stroke="#3a1a08" stroke-width="0.6"/>`; break;
-      case 'dagger': inner = `<rect x="${cx - 0.5}" y="${cy - 4}" width="1" height="6" fill="#cccccc"/><rect x="${cx - 1.5}" y="${cy + 1}" width="3" height="2" fill="#7a4a1a"/>`; break;
-      case 'dice':   inner = `<rect x="${cx - 3}" y="${cy - 3}" width="6" height="6" rx="1" fill="#f0e6c8"/><circle cx="${cx - 1}" cy="${cy - 1}" r="0.6" fill="#1a0a04"/><circle cx="${cx + 1}" cy="${cy + 1}" r="0.6" fill="#1a0a04"/>`; break;
-      case 'flute':  inner = `<rect x="${cx - 3.5}" y="${cy - 0.5}" width="7" height="1.5" rx="0.5" fill="#d4a050"/><circle cx="${cx - 2}" cy="${cy + 0.2}" r="0.3" fill="#3a1a08"/><circle cx="${cx + 1}" cy="${cy + 0.2}" r="0.3" fill="#3a1a08"/>`; break;
-      case 'staff':  inner = `<rect x="${cx - 0.5}" y="${cy - 4}" width="1" height="8" fill="#7a5a2a"/><circle cx="${cx}" cy="${cy - 4}" r="1.4" fill="#f5d76e"/>`; break;
-      case 'chakra': inner = `<circle cx="${cx}" cy="${cy}" r="3" fill="none" stroke="#f5d76e" stroke-width="1"/><circle cx="${cx}" cy="${cy}" r="0.8" fill="#f5d76e"/>`; break;
-      case 'sword':  inner = `<rect x="${cx - 0.5}" y="${cy - 4}" width="1" height="6" fill="#cccccc"/><rect x="${cx - 2}" y="${cy + 1}" width="4" height="1" fill="#7a4a1a"/><rect x="${cx - 0.5}" y="${cy + 1}" width="1" height="3" fill="#7a4a1a"/>`; break;
-      case 'scroll': inner = `<rect x="${cx - 3}" y="${cy - 2}" width="6" height="4" rx="1" fill="#f0e6c8"/><line x1="${cx - 2}" y1="${cy - 1}" x2="${cx + 2}" y2="${cy - 1}" stroke="#7a4a1a" stroke-width="0.4"/><line x1="${cx - 2}" y1="${cy}" x2="${cx + 2}" y2="${cy}" stroke="#7a4a1a" stroke-width="0.4"/>`; break;
-      default: return '';
+  function bow(c) {
+    return `
+<!-- bow body -->
+<path d="M-12 -14 Q14 0 -12 14" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+<!-- string -->
+<line x1="-12" y1="-14" x2="-12" y2="14" stroke="${c}" stroke-width="0.8" opacity="0.85"/>
+<!-- arrow -->
+<line x1="-10" y1="0" x2="14" y2="0" stroke="${c}" stroke-width="1.6"/>
+<polygon points="14,-3 18,0 14,3" fill="${c}"/>
+<!-- fletching -->
+<polygon points="-10,-2 -12,0 -10,2" fill="${c}"/>`;
+  }
+
+  function twin(c) {
+    // twin daggers crossed (Nakula / Sahadeva — Ashvini twins)
+    return `
+<g transform="rotate(-25)">
+  <rect x="-1" y="-12" width="2" height="14" fill="${c}"/>
+  <rect x="-2.5" y="2" width="5" height="2" fill="${c}"/>
+  <rect x="-0.7" y="4" width="1.4" height="3" fill="${c}"/>
+</g>
+<g transform="rotate(25)">
+  <rect x="-1" y="-12" width="2" height="14" fill="${c}"/>
+  <rect x="-2.5" y="2" width="5" height="2" fill="${c}"/>
+  <rect x="-0.7" y="4" width="1.4" height="3" fill="${c}"/>
+</g>`;
+  }
+
+  function scroll(c) {
+    return `
+<rect x="-10" y="-8" width="20" height="16" rx="2" fill="${c}" opacity="0.95"/>
+<rect x="-12" y="-8" width="2" height="16" rx="1" fill="${c}"/>
+<rect x="10"  y="-8" width="2" height="16" rx="1" fill="${c}"/>
+<line x1="-7" y1="-3" x2="7" y2="-3" stroke="#1a0a04" stroke-width="0.8"/>
+<line x1="-7" y1="0"  x2="7" y2="0"  stroke="#1a0a04" stroke-width="0.8"/>
+<line x1="-7" y1="3"  x2="7" y2="3"  stroke="#1a0a04" stroke-width="0.8"/>`;
+  }
+
+  function arrowBed(c) {
+    // Bhishma's bed of arrows — multiple arrows pointing up
+    let arrows = '';
+    for (let i = -2; i <= 2; i++) {
+      const x = i * 4;
+      arrows += `
+        <line x1="${x}" y1="-12" x2="${x}" y2="12" stroke="${c}" stroke-width="1.6"/>
+        <polygon points="${x - 2},-12 ${x},-15 ${x + 2},-12" fill="${c}"/>
+        <polygon points="${x - 2},12 ${x},14 ${x + 2},12" fill="${c}"/>`;
     }
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#1a0a04" stroke="#7a5208" stroke-width="0.6"/>${inner}`;
+    return arrows;
+  }
+
+  function flame(c) {
+    return `
+<path d="M0 -14 Q-8 -6 -7 0 Q-9 8 0 14 Q9 8 7 0 Q8 -6 0 -14 Z" fill="${c}" stroke="#1a0a04" stroke-width="0.8"/>
+<path d="M0 -10 Q-4 -4 -3 2 Q-4 8 0 10 Q4 8 3 2 Q4 -4 0 -10 Z" fill="#ffe294" opacity="0.7"/>`;
+  }
+
+  function sun(c) {
+    let rays = '';
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const x1 = Math.cos(a) * 9, y1 = Math.sin(a) * 9;
+      const x2 = Math.cos(a) * 15, y2 = Math.sin(a) * 15;
+      rays += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`;
+    }
+    return `
+${rays}
+<circle r="8" fill="${c}" stroke="#1a0a04" stroke-width="0.8"/>
+<circle r="4" fill="none" stroke="#1a0a04" stroke-width="0.6"/>`;
+  }
+
+  function gem(c) {
+    return `
+<polygon points="0,-13 9,-3 5,12 -5,12 -9,-3" fill="${c}" stroke="#1a0a04" stroke-width="1.2"/>
+<polygon points="0,-13 9,-3 -9,-3" fill="${lighten(c, 0.3)}" opacity="0.85"/>
+<polygon points="0,-13 -9,-3 -5,12" fill="${darken(c, 0.2)}" opacity="0.7"/>
+<line x1="-9" y1="-3" x2="9" y2="-3" stroke="#1a0a04" stroke-width="0.6"/>
+<circle r="2" cy="3" fill="#fff" opacity="0.5"/>`;
+  }
+
+  function dice(c) {
+    return `
+<rect x="-12" y="-12" width="14" height="14" rx="2" fill="${c}" stroke="#1a0a04" stroke-width="1.2"/>
+<circle cx="-5" cy="-5" r="1.4" fill="#1a0a04"/>
+<circle cx="-5" cy="-5" r="0.5" fill="#fff" opacity="0.5"/>
+<rect x="-2" y="-2" width="14" height="14" rx="2" fill="${c}" stroke="#1a0a04" stroke-width="1.2"/>
+<circle cx="2"  cy="2" r="1.2" fill="#1a0a04"/>
+<circle cx="5"  cy="5" r="1.2" fill="#1a0a04"/>
+<circle cx="8"  cy="8" r="1.2" fill="#1a0a04"/>`;
   }
 
   function darken(hex, amt) {
@@ -168,7 +264,6 @@ ${ring ? `<circle cx="32" cy="32" r="30.5" fill="none" stroke="${ring}" stroke-w
     const [r, g, b] = parseHex(hex);
     return `rgb(${Math.round(r + (255 - r) * amt)},${Math.round(g + (255 - g) * amt)},${Math.round(b + (255 - b) * amt)})`;
   }
-  function shadow(hex) { return darken(hex, 0.3); }
   function parseHex(hex) {
     if (hex[0] !== '#') return [200, 200, 200];
     const h = hex.slice(1);
@@ -176,5 +271,18 @@ ${ring ? `<circle cx="32" cy="32" r="30.5" fill="none" stroke="${ring}" stroke-w
     return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
   }
 
-  window.Portraits = { svg, TRAITS };
+  // Old TRAITS shape kept for backward compat with the canvas player blob
+  // (skin tone etc.) — but now it just returns a color hint.
+  const TRAITS = {};
+  Object.keys(CHAR).forEach(k => {
+    TRAITS[k] = {
+      skin: lighten(CHAR[k].color, 0.5),
+      hair: '#1a0a04',
+      beard: false,
+      hat: 'none',
+      motif: CHAR[k].glyph
+    };
+  });
+
+  window.Portraits = { svg, TRAITS, CHAR };
 })();

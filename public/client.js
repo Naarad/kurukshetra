@@ -861,56 +861,22 @@ function drawCharacterBlob(x, y, r, color, facing, label, alpha = 1, hpPct = 1, 
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // ---- character-specific head/skin overlay ----
-  const traits = (window.Portraits && charKey && window.Portraits.TRAITS[charKey]) || null;
-  if (traits) {
-    // skin head circle on top half
-    const headR = r * 0.7;
-    const hy = y - r * 0.05;
-    ctx.fillStyle = traits.skin;
-    ctx.beginPath(); ctx.arc(x, hy, headR, 0, Math.PI * 2); ctx.fill();
-    // hair fringe
-    ctx.fillStyle = traits.hair;
+  // ---- centered Devanagari letter for the character (clean, readable) ----
+  const charInfo = window.Portraits && charKey && window.Portraits.CHAR && window.Portraits.CHAR[charKey];
+  if (charInfo) {
+    // a small accent ring just inside the body
+    ctx.strokeStyle = charInfo.accent;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(x - headR * 0.95, hy - headR * 0.1);
-    ctx.quadraticCurveTo(x, hy - headR * 1.1, x + headR * 0.95, hy - headR * 0.1);
-    ctx.quadraticCurveTo(x, hy - headR * 0.7, x - headR * 0.95, hy - headR * 0.1);
-    ctx.fill();
-    // beard if applicable
-    if (traits.beard) {
-      ctx.fillStyle = traits.hair;
-      ctx.beginPath();
-      ctx.moveTo(x - headR * 0.7, hy + headR * 0.3);
-      ctx.quadraticCurveTo(x, hy + headR * 1.1, x + headR * 0.7, hy + headR * 0.3);
-      ctx.fill();
-    }
-    // headwear cap (color band based on hat type)
-    let capColor = '#f5d76e';
-    if (traits.hat === 'crown' || traits.hat === 'peacock') capColor = '#f5d76e';
-    else if (traits.hat === 'helmet') capColor = '#8b6f3a';
-    else if (traits.hat === 'headband') capColor = '#1f4673';
-    else if (traits.hat === 'hood') capColor = '#3a3022';
-    else if (traits.hat === 'gem') capColor = '#5dd4ad';
-    if (traits.hat !== 'none' && traits.hat !== 'circlet') {
-      ctx.fillStyle = capColor;
-      ctx.beginPath();
-      ctx.ellipse(x, hy - headR * 0.65, headR * 0.95, headR * 0.45, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // peacock feather flick
-      if (traits.hat === 'peacock') {
-        ctx.strokeStyle = '#1f8a5a'; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x + headR * 0.6, hy - headR * 0.7);
-        ctx.quadraticCurveTo(x + headR * 1.6, hy - headR * 1.6, x + headR * 1.2, hy - headR * 2);
-        ctx.stroke();
-        ctx.fillStyle = '#fbe23a';
-        ctx.beginPath(); ctx.arc(x + headR * 1.2, hy - headR * 2, 2, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    // eyes
-    ctx.fillStyle = '#0a0604';
-    ctx.beginPath(); ctx.arc(x - headR * 0.32, hy + headR * 0.05, 1.4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x + headR * 0.32, hy + headR * 0.05, 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.arc(x, y, r - 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.round(r * 1.0)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(charInfo.letter, x, y + 1);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'start';
   } else if (label) {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 12px sans-serif';
