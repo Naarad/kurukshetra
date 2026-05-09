@@ -36,9 +36,107 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRules(); });
 
+// ----------------- auth tabs + flows -----------------
+let currentAuthMode = 'login';
+let signedInUser = null;
+
+$$('.auth-tab').forEach(b => b.addEventListener('click', () => {
+  currentAuthMode = b.dataset.auth;
+  $$('.auth-tab').forEach(t => t.classList.toggle('active', t === b));
+  $$('.auth-pane').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== currentAuthMode));
+}));
+
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/me').then(x => x.json());
+    if (r.ok && r.username) {
+      signedInUser = r.username;
+      $('#authBox').classList.add('hidden');
+      $('#signedInBox').classList.remove('hidden');
+      $('#signedInName').textContent = r.username;
+    } else {
+      signedInUser = null;
+      $('#authBox').classList.remove('hidden');
+      $('#signedInBox').classList.add('hidden');
+    }
+  } catch (e) { /* ignore */ }
+}
+checkAuth();
+
+function showAuthError(msg) {
+  const el = $('#authError'); el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none';
+}
+
+$('#btnLogin').addEventListener('click', async () => {
+  const username = $('#loginUser').value.trim();
+  const password = $('#loginPass').value;
+  showAuthError('');
+  try {
+    const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) }).then(x => x.json());
+    if (!r.ok) return showAuthError(r.error || 'Sign-in failed');
+    await checkAuth();
+  } catch (e) { showAuthError('Network error'); }
+});
+$('#btnRegister').addEventListener('click', async () => {
+  const username = $('#regUser').value.trim();
+  const password = $('#regPass').value;
+  showAuthError('');
+  try {
+    const r = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) }).then(x => x.json());
+    if (!r.ok) return showAuthError(r.error || 'Registration failed');
+    await checkAuth();
+  } catch (e) { showAuthError('Network error'); }
+});
+$('#btnLogout').addEventListener('click', async () => {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  signedInUser = null;
+  await checkAuth();
+});
+$('#btnProfile').addEventListener('click', async () => {
+  $('#profile-modal').classList.remove('hidden');
+  $('#profileBody').textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/me/history').then(x => x.json());
+    if (!r.ok) { $('#profileBody').textContent = 'Could not load.'; return; }
+    renderProfile(r.stats);
+  } catch (e) { $('#profileBody').textContent = 'Network error.'; }
+});
+document.addEventListener('click', (e) => {
+  if (e.target.matches('[data-close-profile]') || e.target.id === 'profile-modal') {
+    $('#profile-modal').classList.add('hidden');
+  }
+});
+
+function renderProfile(s) {
+  $('#profileTitle').textContent = `${s.username} — record`;
+  const winRate = (s.winRate * 100).toFixed(0);
+  const charRows = Object.entries(s.byCharacter || {})
+    .sort((a, b) => b[1].played - a[1].played)
+    .map(([k, v]) => `<tr><td>${CHARACTERS[k]?.name || k}</td><td>${v.played}</td><td>${v.wins}</td><td>${v.kills}</td></tr>`).join('');
+  const recent = (s.recent || []).slice(0, 10).map(m => `
+    <tr>
+      <td>${new Date(m.endedAt).toLocaleString()}</td>
+      <td>${CHARACTERS[m.character]?.name || m.character || '?'}</td>
+      <td style="color:${m.team === 'pandavas' ? '#5a8cff' : '#ff6b58'}">${cap(m.team || '')}</td>
+      <td style="color:${m.won ? '#2ecc71' : '#e74c3c'}">${m.won ? 'Won' : 'Lost'}</td>
+      <td>${m.kills || 0}</td>
+    </tr>`).join('');
+  $('#profileBody').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat"><span class="stat-num">${s.total}</span><span class="stat-label">matches</span></div>
+      <div class="stat"><span class="stat-num">${s.wins}</span><span class="stat-label">wins</span></div>
+      <div class="stat"><span class="stat-num">${winRate}%</span><span class="stat-label">win rate</span></div>
+      <div class="stat"><span class="stat-num">${s.kills}</span><span class="stat-label">kills</span></div>
+    </div>
+    ${charRows ? `<h3>By character</h3><table class="stats-table"><tr><th>Character</th><th>Played</th><th>Wins</th><th>Kills</th></tr>${charRows}</table>` : ''}
+    ${recent ? `<h3>Recent matches</h3><table class="stats-table"><tr><th>When</th><th>Character</th><th>Side</th><th>Result</th><th>Kills</th></tr>${recent}</table>` : '<p>No matches yet — go forth.</p>'}
+  `;
+}
+
 // ----------------- join -----------------
 $('#btnJoin').addEventListener('click', async () => {
-  const name = $('#displayName').value.trim() || 'Warrior';
+  // signed in users use their username as display name
+  const name = signedInUser || ($('#displayName')?.value.trim() || 'Warrior');
   const room = $('#roomId').value.trim() || 'kurukshetra';
   const cdata = await fetch('/api/characters').then(r => r.json());
   CHARACTERS = cdata.CHARACTERS;
@@ -167,12 +265,21 @@ function renderAutoLobby(snap) {
     const tile = document.createElement('div');
     const voiceCls = p.voiceEnabled ? (p.voiceMuted ? ' voice-muted' : ' voice-on') : '';
     tile.className = 'player-tile' + (p.socketId === mySocketId ? ' is-me' : '') + (p.ready ? ' is-ready' : '') + (p.isBot ? ' is-bot' : '') + voiceCls;
-    const initial = p.isBot ? '🤖' : (p.displayName || '?').charAt(0).toUpperCase();
     const voiceTag = p.voiceEnabled ? (p.voiceMuted ? ' · 🔇' : ' · 🎤') : '';
-    const status = p.isBot ? 'AI · auto-ready' : (p.ready ? 'Ready for war' : 'Awaiting…');
+    const status = p.isBot
+      ? 'AI · auto-ready'
+      : (p.character ? CHARACTERS[p.character]?.name + ' · ' + cap(p.team) : (p.ready ? 'Ready for war' : 'Awaiting…'));
+    let avatar;
+    if (p.character && window.Portraits) {
+      const ringColor = p.team === 'pandavas' ? '#5a8cff' : '#ff6b58';
+      avatar = `<div class="avatar portrait-avatar">${window.Portraits.svg(p.character, { size: 44, ring: ringColor })}</div>`;
+    } else {
+      const initial = p.isBot ? '🤖' : (p.displayName || '?').charAt(0).toUpperCase();
+      avatar = `<div class="avatar">${escapeHtml(initial)}</div>`;
+    }
     tile.innerHTML = `
       <div class="voice-dot"></div>
-      <div class="avatar">${escapeHtml(initial)}</div>
+      ${avatar}
       <div class="meta">
         <div class="name">${escapeHtml(p.displayName)}${voiceTag}</div>
         <div class="status">${status}${p.socketId === mySocketId ? ' · you' : ''}</div>
@@ -198,12 +305,18 @@ function renderRosters() {
       card.dataset.char = key;
       card.dataset.team = team;
       card.style.setProperty('--card-glow', c.color);
+      const portrait = window.Portraits ? window.Portraits.svg(key, { size: 56, ring: c.color }) : '';
       card.innerHTML = `
         <div class="swatch" style="background:${c.color}; box-shadow:0 0 14px ${c.color}66"></div>
         <div class="picker"></div>
-        <h3>${c.name}</h3>
-        <div class="title">${c.title}</div>
-        <div class="stats">HP ${c.hp} · SPD ${c.speed.toFixed ? c.speed.toFixed(1) : c.speed}</div>
+        <div class="char-head">
+          <div class="portrait">${portrait}</div>
+          <div class="head-meta">
+            <h3>${c.name}</h3>
+            <div class="title">${c.title}</div>
+            <div class="stats">HP ${c.hp} · SPD ${c.speed.toFixed ? c.speed.toFixed(1) : c.speed}</div>
+          </div>
+        </div>
         <div class="ab"><b>${c.basic.name}</b> · ${c.basic.kind}</div>
         <div class="ab"><b>${c.ability.name}</b> — ${c.ability.desc || ''}</div>
         <div class="astra">★ ${c.astra.name} — ${c.astra.desc || ''}</div>
@@ -425,9 +538,15 @@ function updateArena(snap) {
     const c = CHARACTERS[me.character] || {};
     const meCard = $('#myCard');
     meCard.style.setProperty('--my-color', me.color);
+    const myPortrait = window.Portraits ? window.Portraits.svg(me.character, { size: 52, ring: me.color }) : '';
     meCard.innerHTML = `
-      <div class="name" style="color:${me.color}">${me.name}</div>
-      <div class="title">${me.title || ''} · ${cap(me.team)}</div>
+      <div class="me-row">
+        <div class="me-portrait">${myPortrait}</div>
+        <div class="me-text">
+          <div class="name" style="color:${me.color}">${me.name}</div>
+          <div class="title">${me.title || ''} · ${cap(me.team)}</div>
+        </div>
+      </div>
       <div class="hpbar"><div class="fill" style="width:${(me.hp / me.maxHp) * 100}%"></div></div>
       <div class="stats-line">HP ${me.hp}/${me.maxHp} · Kills ${me.kills} · Dmg ${me.damageDealt}</div>
     `;
@@ -709,7 +828,7 @@ function drawPlayers(snap, me) {
       if (me && me.team !== p.team) alpha = 0.07;
     }
     const isInvulnerable = p.invulnerableUntil && p.invulnerableUntil > now;
-    drawCharacterBlob(p.x, p.y, p.radius, p.color, p.facing, (p.name || '?').charAt(0), alpha, p.hp / p.maxHp, isInvulnerable);
+    drawCharacterBlob(p.x, p.y, p.radius, p.color, p.facing, (p.name || '?').charAt(0), alpha, p.hp / p.maxHp, isInvulnerable, p.character);
     // name tag
     const voiceGlyph = p.voiceEnabled ? (p.voiceMuted ? ' 🔇' : ' 🎤') : '';
     ctx.fillStyle = p.team === 'pandavas' ? '#5a8cff' : '#ff6b58';
@@ -723,7 +842,7 @@ function drawPlayers(snap, me) {
   }
 }
 
-function drawCharacterBlob(x, y, r, color, facing, label, alpha = 1, hpPct = 1, invulnerable = false) {
+function drawCharacterBlob(x, y, r, color, facing, label, alpha = 1, hpPct = 1, invulnerable = false, charKey = null) {
   ctx.save();
   ctx.globalAlpha = alpha;
   // soft glow under character
@@ -733,20 +852,80 @@ function drawCharacterBlob(x, y, r, color, facing, label, alpha = 1, hpPct = 1, 
   ctx.fillStyle = glow;
   ctx.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
 
-  // body radial fill
+  // body / shoulders (team-tinted)
   const bg = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.2, x, y, r);
-  bg.addColorStop(0, lighten(color, 0.4));
+  bg.addColorStop(0, lighten(color, 0.35));
   bg.addColorStop(1, color);
   ctx.fillStyle = bg;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
 
-  // facing wedge
-  ctx.fillStyle = 'rgba(255,255,255,.7)';
+  // ---- character-specific head/skin overlay ----
+  const traits = (window.Portraits && charKey && window.Portraits.TRAITS[charKey]) || null;
+  if (traits) {
+    // skin head circle on top half
+    const headR = r * 0.7;
+    const hy = y - r * 0.05;
+    ctx.fillStyle = traits.skin;
+    ctx.beginPath(); ctx.arc(x, hy, headR, 0, Math.PI * 2); ctx.fill();
+    // hair fringe
+    ctx.fillStyle = traits.hair;
+    ctx.beginPath();
+    ctx.moveTo(x - headR * 0.95, hy - headR * 0.1);
+    ctx.quadraticCurveTo(x, hy - headR * 1.1, x + headR * 0.95, hy - headR * 0.1);
+    ctx.quadraticCurveTo(x, hy - headR * 0.7, x - headR * 0.95, hy - headR * 0.1);
+    ctx.fill();
+    // beard if applicable
+    if (traits.beard) {
+      ctx.fillStyle = traits.hair;
+      ctx.beginPath();
+      ctx.moveTo(x - headR * 0.7, hy + headR * 0.3);
+      ctx.quadraticCurveTo(x, hy + headR * 1.1, x + headR * 0.7, hy + headR * 0.3);
+      ctx.fill();
+    }
+    // headwear cap (color band based on hat type)
+    let capColor = '#f5d76e';
+    if (traits.hat === 'crown' || traits.hat === 'peacock') capColor = '#f5d76e';
+    else if (traits.hat === 'helmet') capColor = '#8b6f3a';
+    else if (traits.hat === 'headband') capColor = '#1f4673';
+    else if (traits.hat === 'hood') capColor = '#3a3022';
+    else if (traits.hat === 'gem') capColor = '#5dd4ad';
+    if (traits.hat !== 'none' && traits.hat !== 'circlet') {
+      ctx.fillStyle = capColor;
+      ctx.beginPath();
+      ctx.ellipse(x, hy - headR * 0.65, headR * 0.95, headR * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // peacock feather flick
+      if (traits.hat === 'peacock') {
+        ctx.strokeStyle = '#1f8a5a'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + headR * 0.6, hy - headR * 0.7);
+        ctx.quadraticCurveTo(x + headR * 1.6, hy - headR * 1.6, x + headR * 1.2, hy - headR * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#fbe23a';
+        ctx.beginPath(); ctx.arc(x + headR * 1.2, hy - headR * 2, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    // eyes
+    ctx.fillStyle = '#0a0604';
+    ctx.beginPath(); ctx.arc(x - headR * 0.32, hy + headR * 0.05, 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + headR * 0.32, hy + headR * 0.05, 1.4, 0, Math.PI * 2); ctx.fill();
+  } else if (label) {
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x, y);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'start';
+  }
+
+  // facing wedge (drawn on top so directionality remains obvious)
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.arc(x, y, r + 8, facing - 0.22, facing + 0.22);
+  ctx.arc(x, y, r + 8, facing - 0.18, facing + 0.18);
   ctx.closePath();
   ctx.fill();
 
@@ -754,15 +933,6 @@ function drawCharacterBlob(x, y, r, color, facing, label, alpha = 1, hpPct = 1, 
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-
-  // initial
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, x, y);
-  ctx.textBaseline = 'alphabetic';
-  ctx.textAlign = 'start';
 
   // hp ring
   ctx.beginPath();

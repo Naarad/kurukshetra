@@ -4,6 +4,7 @@
 const { CHARACTERS, TEAM_ROSTER, buildPlayerState } = require('./characters');
 const { generate, key, CELL, GRID_W, GRID_H } = require('./vyuhas');
 const { makeBotId, pickBotName, simulateBot } = require('./bot');
+const accounts = require('./accounts');
 
 const TICK_MS = 1000 / 30;
 const SETUP_MS = 60_000;        // 60s to place traps in classical mode
@@ -78,12 +79,13 @@ class Match {
   }
 
   // -------- lobby ops --------
-  addPlayer(socketId, displayName) {
+  addPlayer(socketId, displayName, opts = {}) {
     const teamCounts = this.teamCounts();
     const team = teamCounts.pandavas <= teamCounts.kauravas ? 'pandavas' : 'kauravas';
     this.players.set(socketId, {
       socketId,
       displayName: displayName || ('Warrior-' + socketId.slice(0, 4)),
+      authedUser: opts.authedUser || null,
       team,
       character: null,
       ready: false,
@@ -288,6 +290,23 @@ class Match {
       this.phase = 'match_over';
       this.phaseEndsAt = Date.now() + 12000;
       this.pushEvent(`Match over! ${capitalize(winnerTeam)} win the war.`);
+      this._recordMatchHistory(winnerTeam);
+    }
+  }
+
+  _recordMatchHistory(winnerTeam) {
+    for (const p of this.players.values()) {
+      if (!p.authedUser || p.isBot) continue;
+      accounts.recordMatch(p.authedUser, {
+        endedAt: Date.now(),
+        team: p.team,
+        won: p.team === winnerTeam,
+        character: p.character,
+        kills: p.kills || 0,
+        damageDealt: p.damageDealt || 0,
+        damageTaken: p.damageTaken || 0,
+        roomId: this.roomId
+      });
     }
   }
 

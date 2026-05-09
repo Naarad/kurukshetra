@@ -17,13 +17,55 @@
         <div class="om-mark">ॐ</div>
         <h1>Kurukshetra</h1>
         <p class="subtitle">The dharma-yuddha. Break the vyuha. Survive the maze. Forge a legend.</p>
-        <label>Your name<input id="displayName" maxlength="18" placeholder="e.g. Naarad" /></label>
+
+        <!-- Auth tabs (hidden when already signed in) -->
+        <div id="authBox">
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-auth="login">Sign in</button>
+            <button class="auth-tab" data-auth="register">Create account</button>
+            <button class="auth-tab" data-auth="guest">Play as guest</button>
+          </div>
+
+          <div class="auth-pane" data-pane="login">
+            <label>Username<input id="loginUser" maxlength="18" autocomplete="username" /></label>
+            <label>Password<input id="loginPass" type="password" maxlength="64" autocomplete="current-password" /></label>
+            <button id="btnLogin">🔑 Sign in</button>
+          </div>
+          <div class="auth-pane hidden" data-pane="register">
+            <label>Username (3–18 chars, letters/numbers/_)<input id="regUser" maxlength="18" autocomplete="username" /></label>
+            <label>Password (6+ chars)<input id="regPass" type="password" maxlength="64" autocomplete="new-password" /></label>
+            <button id="btnRegister">✨ Create account</button>
+            <p class="hint">Track your wins, kills, and per-character stats across matches.</p>
+          </div>
+          <div class="auth-pane hidden" data-pane="guest">
+            <label>Display name<input id="displayName" maxlength="18" placeholder="e.g. Naarad" /></label>
+            <p class="hint">Guest play has no history saved. You can always create an account later.</p>
+          </div>
+          <div class="auth-error" id="authError"></div>
+        </div>
+
+        <!-- Signed-in pill -->
+        <div id="signedInBox" class="signed-in hidden">
+          <span>Signed in as <b id="signedInName"></b></span>
+          <button id="btnProfile" class="ghost">📊 Profile</button>
+          <button id="btnLogout" class="ghost">Sign out</button>
+        </div>
+
         <label>Room code<input id="roomId" maxlength="20" placeholder="kurukshetra" value="kurukshetra" /></label>
         <button id="btnJoin">⚔️ Enter the field</button>
         <button id="btnRulesJoin" class="secondary">📜 How to play</button>
         <p class="hint">Share this page's link + the room code with friends — they enter the same code and join your war.</p>
       </div>
     </section>
+
+    <!-- Profile modal -->
+    <div id="profile-modal" class="rules-modal hidden">
+      <div class="rules-card profile-card">
+        <button class="close-x" data-close-profile>✕</button>
+        <h2 id="profileTitle">Your record</h2>
+        <div id="profileBody">Loading…</div>
+      </div>
+    </div>
 
     <!-- LOBBY / CHARACTER SELECT -->
     <section id="screen-select" class="screen hidden">
@@ -223,6 +265,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/portraits.js"></script>
   <script src="/voice.js"></script>
   <script src="/music.js"></script>
   <script src="/client.js"></script>

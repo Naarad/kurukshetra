@@ -5,15 +5,51 @@ const path = require('path');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const cookieParser = require('cookie-parser');
 const { Match } = require('./game/engine');
 const { CHARACTERS, TEAM_ROSTER } = require('./game/characters');
+const accounts = require('./game/accounts');
 
 const PORT = process.env.PORT || 3000;
 const app = express();
+app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/characters', (req, res) => {
   res.json({ CHARACTERS, TEAM_ROSTER });
+});
+
+// ---- account routes ----
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    const { token, username: u } = await accounts.register(username, password);
+    res.cookie('kurukshetra_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
+    res.json({ ok: true, username: u });
+  } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    const { token, username: u } = await accounts.login(username, password);
+    res.cookie('kurukshetra_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
+    res.json({ ok: true, username: u });
+  } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('kurukshetra_token');
+  res.json({ ok: true });
+});
+app.get('/api/me', (req, res) => {
+  const u = accounts.verifyToken(req.cookies.kurukshetra_token);
+  if (!u) return res.json({ ok: false });
+  res.json({ ok: true, username: u });
+});
+app.get('/api/me/history', (req, res) => {
+  const u = accounts.verifyToken(req.cookies.kurukshetra_token);
+  if (!u) return res.status(401).json({ ok: false });
+  res.json({ ok: true, stats: accounts.getStats(u) });
 });
 
 const server = http.createServer(app);
@@ -28,6 +64,10 @@ function getRoom(roomId) {
 
 io.on('connection', (socket) => {
   let currentRoom = null;
+  // try to read auth cookie from the original handshake
+  const cookieHeader = socket.handshake.headers.cookie || '';
+  const tokenMatch = cookieHeader.match(/kurukshetra_token=([^;]+)/);
+  const authedUser = tokenMatch ? accounts.verifyToken(decodeURIComponent(tokenMatch[1])) : null;
 
   socket.on('joinRoom', ({ roomId, displayName }) => {
     if (currentRoom) socket.leave(currentRoom);
@@ -38,7 +78,8 @@ io.on('connection', (socket) => {
     if (match.phase !== 'lobby' && match.phase !== 'match_over') {
       // mid-match: still join as spectator-but-bench (shows in next round)
     }
-    match.addPlayer(socket.id, displayName);
+    // logged-in users get their account name; guests use the typed name
+    match.addPlayer(socket.id, authedUser || displayName, { authedUser });
     socket.emit('joined', { roomId: r, you: socket.id });
     match.broadcast();
   });

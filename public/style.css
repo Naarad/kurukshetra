@@ -666,6 +666,114 @@ body.is-mobile #game { height: 60vh; min-height: 360px; }
 body.is-mobile .sidebar { max-height: 30vh; overflow: auto; }
 
 /* =========================================================
+   Auth (login / register / guest)
+   ========================================================= */
+.auth-tabs {
+  display: flex; gap: 4px; padding: 4px;
+  background: rgba(0,0,0,.55); border: 1px solid #3a2a14;
+  border-radius: 10px; margin: 16px 0 12px;
+}
+.auth-tab {
+  flex: 1; background: transparent; color: var(--ink-dim);
+  border: none; padding: 8px 6px; font-size: 12px; font-weight: 700;
+  letter-spacing: .5px; border-radius: 6px; box-shadow: none;
+}
+.auth-tab.active {
+  background: linear-gradient(180deg, #d6a23f, #8b5a14); color: #1a1107;
+  box-shadow: 0 1px 0 #4d3208;
+}
+.auth-pane { padding: 4px 0; }
+.auth-pane.hidden { display: none; }
+.auth-pane button { width: 100%; margin-top: 12px; padding: 12px; font-size: 15px; }
+.auth-error {
+  display: none; background: rgba(192,57,43,.15);
+  color: var(--kaurava-glow); border: 1px solid var(--kaurava);
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 10px;
+}
+
+.signed-in {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 14px; margin: 12px 0;
+  background: rgba(46,204,113,.1); border: 1px solid rgba(46,204,113,.3);
+  border-radius: 10px; color: var(--ink); font-size: 14px;
+}
+.signed-in b { color: #2ecc71; }
+.signed-in.hidden { display: none; }
+.signed-in button.ghost { padding: 4px 10px; font-size: 11px; flex: 0 0 auto; }
+
+/* =========================================================
+   Profile modal
+   ========================================================= */
+.profile-card { max-width: 640px; }
+.stats-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin: 16px 0;
+}
+.stats-grid .stat {
+  background: rgba(0,0,0,.4); border: 1px solid #3a2a14;
+  border-radius: 8px; padding: 12px; text-align: center;
+}
+.stat-num {
+  display: block; font-size: 24px; color: var(--gold);
+  font-weight: 700; line-height: 1;
+}
+.stat-label {
+  display: block; font-size: 11px; color: var(--ink-dim);
+  letter-spacing: 1px; text-transform: uppercase; margin-top: 4px;
+}
+.stats-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  margin-top: 12px; margin-bottom: 16px;
+}
+.stats-table th, .stats-table td {
+  text-align: left; padding: 6px 10px; border-bottom: 1px solid #3a2a14;
+}
+.stats-table th {
+  color: var(--gold); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase; font-weight: 700;
+}
+.stats-table td { color: var(--ink-dim); }
+
+/* mobile tweaks */
+@media (max-width: 768px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .auth-tab { font-size: 11px; padding: 8px 4px; }
+}
+
+/* =========================================================
+   Character portraits
+   ========================================================= */
+.char-head {
+  display: flex; gap: 10px; align-items: flex-start; margin-bottom: 6px;
+}
+.char-head .portrait {
+  width: 52px; height: 52px; flex-shrink: 0;
+  border-radius: 50%; overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,.5);
+}
+.char-head .head-meta { flex: 1; min-width: 0; }
+.char-head .head-meta h3 { margin: 0; }
+
+.portrait-avatar {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 50%;
+}
+.portrait-avatar svg { display: block; width: 100%; height: 100%; }
+
+.me-row { display: flex; gap: 12px; align-items: center; }
+.me-portrait {
+  width: 50px; height: 50px;
+  border-radius: 50%; overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+}
+.me-portrait svg { display: block; width: 100%; height: 100%; }
+.me-text { flex: 1; min-width: 0; }
+
+/* =========================================================
    Leave-room button
    ========================================================= */
 button.btn-leave {
