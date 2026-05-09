@@ -596,29 +596,69 @@ kbd {
   pointer-events: none;
 }
 .touch-buttons {
-  position: absolute; bottom: 180px; right: 18px;
-  display: flex; flex-direction: column; gap: 10px;
+  position: absolute; bottom: 18px; right: 18px;
+  display: flex; flex-direction: column; gap: 12px;
   pointer-events: auto;
 }
 .tbtn {
-  width: 64px; height: 64px;
+  width: 78px; height: 78px;
   border-radius: 50%;
   background: linear-gradient(180deg, #d6a23f, #8b5a14);
   border: 2px solid #2a1a08; color: #1a1107;
-  font-size: 18px; font-weight: 800;
+  font-size: 14px; font-weight: 800;
   box-shadow: 0 4px 0 #4d3208, 0 0 14px rgba(245,215,110,.2);
   cursor: pointer; padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  letter-spacing: .5px;
 }
+.tbtn .key-glyph {
+  font-size: 22px; font-weight: 900; line-height: 1;
+}
+.tbtn .ability-label { font-size: 9px; letter-spacing: 1.5px; opacity: .85; }
 .tbtn:active { transform: translateY(2px); box-shadow: 0 2px 0 #4d3208; }
-.tbtn.astra {
+.tbtn.astra-btn {
   background: linear-gradient(180deg, #f5d76e, #b58610);
   animation: tbtnPulse 1.6s ease-in-out infinite;
 }
+.tbtn.astra-btn .key-glyph { color: #5a2a08; }
 @keyframes tbtnPulse {
   0%, 100% { box-shadow: 0 4px 0 #4d3208, 0 0 8px rgba(245,215,110,.2); }
   50%      { box-shadow: 0 4px 0 #4d3208, 0 0 24px rgba(245,215,110,.6); }
 }
 .tbtn.disabled { opacity: .35; filter: grayscale(.6); }
+
+/* Setup tool toggle (mobile) */
+.setup-tools {
+  position: absolute; bottom: 110px; right: 18px;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: auto;
+}
+.setup-tools.hidden { display: none; }
+.tool-btn {
+  background: rgba(0,0,0,.55);
+  color: var(--ink-dim);
+  border: 1px solid #5a3e18;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px; font-weight: 700;
+  box-shadow: none;
+}
+.tool-btn.active {
+  background: linear-gradient(180deg, #c0392b, #6e1f15);
+  color: #fff;
+  border-color: #2a0808;
+}
+.tool-btn.hidden { display: none; }
+
+/* Aim hint */
+.aim-hint {
+  position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; letter-spacing: 1.5px;
+  color: rgba(245,215,110,.45);
+  background: rgba(0,0,0,.4);
+  padding: 4px 12px; border-radius: 999px;
+  white-space: nowrap; pointer-events: none;
+}
 
 body.is-mobile .legend { display: none; }
 body.is-mobile .arena-wrap { grid-template-columns: 1fr; padding-bottom: 200px; }
@@ -824,12 +864,14 @@ button.btn-leave:hover {
   .voice-channel { font-size: 10px; }
 
   /* MOBILE TOUCH CONTROLS */
-  .touch-zone { width: 130px; height: 130px; bottom: 12px; }
-  .touch-move { left: 10px; }
-  .touch-aim { right: 10px; }
-  .stick-knob { width: 50px; height: 50px; margin-left: -25px; margin-top: -25px; }
-  .touch-buttons { bottom: 150px; right: 10px; gap: 8px; }
-  .tbtn { width: 56px; height: 56px; font-size: 16px; }
+  .touch-zone { width: 140px; height: 140px; bottom: 14px; }
+  .touch-move { left: 12px; }
+  .stick-knob { width: 56px; height: 56px; margin-left: -28px; margin-top: -28px; }
+  .touch-buttons { bottom: 14px; right: 12px; gap: 12px; }
+  .tbtn { width: 72px; height: 72px; font-size: 12px; }
+  .tbtn .key-glyph { font-size: 20px; }
+  .setup-tools { bottom: 100px; right: 12px; }
+  .aim-hint { font-size: 9px; padding: 3px 10px; }
 
   /* OVERLAY (round-over) */
   .overlay .panel { padding: 22px 24px; max-width: 92vw; }
@@ -840,8 +882,9 @@ button.btn-leave:hover {
 @media (max-width: 380px) {
   .roster { grid-template-columns: 1fr; }
   .player-bench { grid-template-columns: 1fr; }
-  .touch-zone { width: 110px; height: 110px; }
-  .tbtn { width: 50px; height: 50px; }
+  .touch-zone { width: 120px; height: 120px; }
+  .tbtn { width: 64px; height: 64px; }
+  .tbtn .key-glyph { font-size: 18px; }
 }
 
 /* Landscape phones — squeeze the canvas taller */

@@ -383,6 +383,23 @@ function onSnapshot(snap) {
     updateArena(snap);
     // toggle mobile-controls visibility once we're in arena
     $('#mobile-controls').classList.toggle('hidden', !IS_TOUCH);
+    if (IS_TOUCH) {
+      const showTools = snap.phase === 'setup';
+      $('#setupTools').classList.toggle('hidden', !showTools);
+      // hide the wall option unless in freebuild
+      const wallBtn = document.querySelector('.tool-btn[data-tool="wall"]');
+      if (wallBtn) wallBtn.classList.toggle('hidden', snap.mazeMode !== 'freebuild');
+      const hint = $('#aimHint');
+      if (hint) {
+        if (snap.phase === 'setup') {
+          hint.textContent = snap.mazeMode === 'freebuild'
+            ? 'Tap canvas to place ' + setupTool
+            : 'Tap canvas to place trap';
+        } else {
+          hint.textContent = 'Auto-aim · drag canvas to override';
+        }
+      }
+    }
   }
 }
 
@@ -860,97 +877,146 @@ function pseudo(seed) {
 }
 
 // =========================================================
-// Mobile touch controls — twin virtual joysticks + buttons
+// Mobile touch controls — single joystick, auto-aim, drag-to-aim
+// Twin-stick is too fiddly for thumbs on small screens. Instead:
+//   • Left joystick: movement only
+//   • Auto-aim: character automatically faces & shoots the nearest
+//     visible enemy when you're not actively aiming
+//   • Drag anywhere on the canvas: overrides aim toward the touch
+//     point; auto-fires while held
+//   • Big buttons for ability and astra
+//   • During setup: a tool toggle (Trap / Wall) and a single tap
+//     places the current tool on the touched tile
 // =========================================================
+let touchAimActive = false;          // user is dragging on canvas to aim
+let setupTool = 'trap';              // 'trap' | 'wall'
+
 function setupTouchControls() {
   if (!IS_TOUCH) return;
 
   const moveZone = $('#touch-move');
-  const aimZone = $('#touch-aim');
   const moveKnob = $('#moveKnob');
-  const aimKnob = $('#aimKnob');
-  const RADIUS = 56; // max knob displacement in px
+  const RADIUS = 60;
 
-  // Generic stick handler
-  function attachStick(zone, knob, onUpdate, onTap) {
+  // ---- Left joystick: movement only ----
+  (function attachMoveStick() {
     let pointerId = null;
     let centerX = 0, centerY = 0;
-    let movedFar = false;
-
     function reset() {
-      knob.style.transform = 'translate(0,0)';
-      onUpdate(0, 0); // released
+      moveKnob.style.transform = 'translate(0,0)';
+      input.up = input.down = input.left = input.right = false;
       pointerId = null;
-      movedFar = false;
     }
-
-    zone.addEventListener('pointerdown', (e) => {
+    moveZone.addEventListener('pointerdown', (e) => {
       if (pointerId !== null) return;
       pointerId = e.pointerId;
-      const rect = zone.getBoundingClientRect();
+      const rect = moveZone.getBoundingClientRect();
       centerX = rect.left + rect.width / 2;
       centerY = rect.top + rect.height / 2;
-      try { zone.setPointerCapture(pointerId); } catch (_) {}
-      handleMove(e);
+      try { moveZone.setPointerCapture(pointerId); } catch (_) {}
+      handle(e);
       e.preventDefault();
     });
-    zone.addEventListener('pointermove', (e) => {
+    moveZone.addEventListener('pointermove', (e) => {
       if (e.pointerId !== pointerId) return;
-      handleMove(e);
+      handle(e);
       e.preventDefault();
     });
-    function endHandler(e) {
+    const end = (e) => {
       if (e.pointerId !== pointerId) return;
-      // tap detection — if the knob never moved far, treat as a tap
-      if (!movedFar && onTap) onTap();
-      try { zone.releasePointerCapture(pointerId); } catch (_) {}
+      try { moveZone.releasePointerCapture(pointerId); } catch (_) {}
       reset();
       e.preventDefault();
-    }
-    zone.addEventListener('pointerup', endHandler);
-    zone.addEventListener('pointercancel', endHandler);
-
-    function handleMove(e) {
+    };
+    moveZone.addEventListener('pointerup', end);
+    moveZone.addEventListener('pointercancel', end);
+    function handle(e) {
       const dx = e.clientX - centerX;
       const dy = e.clientY - centerY;
       const d = Math.hypot(dx, dy);
       const clamped = Math.min(d, RADIUS);
-      if (d > 14) movedFar = true;
       const ang = Math.atan2(dy, dx);
-      const kx = Math.cos(ang) * clamped;
-      const ky = Math.sin(ang) * clamped;
-      knob.style.transform = `translate(${kx}px, ${ky}px)`;
-      onUpdate(d > 8 ? Math.cos(ang) * (clamped / RADIUS) : 0,
-               d > 8 ? Math.sin(ang) * (clamped / RADIUS) : 0);
+      const kx = Math.cos(ang) * clamped, ky = Math.sin(ang) * clamped;
+      moveKnob.style.transform = `translate(${kx}px, ${ky}px)`;
+      const nx = d > 10 ? Math.cos(ang) : 0;
+      const ny = d > 10 ? Math.sin(ang) : 0;
+      input.up = ny < -0.25;
+      input.down = ny > 0.25;
+      input.left = nx < -0.25;
+      input.right = nx > 0.25;
     }
+  })();
+
+  // ---- Right side / canvas: drag to aim, auto-fires while held ----
+  function getCanvasPoint(touch) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    const sy = (touch.clientY - rect.top) * (canvas.height / rect.height);
+    return { sx, sy, wx: sx + camera.x, wy: sy + camera.y };
   }
 
-  // Move stick → input.up/down/left/right
-  attachStick(moveZone, moveKnob, (nx, ny) => {
-    input.up = ny < -0.25;
-    input.down = ny > 0.25;
-    input.left = nx < -0.25;
-    input.right = nx > 0.25;
-  });
-
-  // Aim stick → input.facing; tap fires basic attack
-  let aimHoldTimer = null;
-  attachStick(aimZone, aimKnob, (nx, ny) => {
-    if (Math.hypot(nx, ny) > 0.2) {
-      input.facing = Math.atan2(ny, nx);
-      // hold-to-fire
-      input.attack = true;
-    } else {
-      input.attack = false;
+  let aimPointerId = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    const me = lastSnap?.players.find(p => p.socketId === mySocketId);
+    if (!me) return;
+    // SETUP phase: tap places the current tool
+    if (lastSnap?.phase === 'setup') {
+      const p = getCanvasPoint(e);
+      if (lastSnap.maze) {
+        const cs = lastSnap.maze.cellSize;
+        const tx = Math.floor(p.wx / cs), ty = Math.floor(p.wy / cs);
+        if (setupTool === 'wall' && lastSnap.mazeMode === 'freebuild') {
+          socket?.emit('toggleWall', { x: tx, y: ty });
+        } else {
+          socket?.emit('placeTrap', { x: tx, y: ty });
+        }
+      }
+      e.preventDefault();
+      return;
     }
-  }, () => {
-    // tap → quick fire pulse
-    input.attack = true;
-    if (aimHoldTimer) clearTimeout(aimHoldTimer);
-    aimHoldTimer = setTimeout(() => { input.attack = false; }, 180);
+    // BREAK phase: aim & fire toward touch point
+    aimPointerId = e.pointerId;
+    touchAimActive = true;
+    handleAim(e);
+    e.preventDefault();
   });
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== aimPointerId || lastSnap?.phase !== 'break') return;
+    handleAim(e);
+    e.preventDefault();
+  });
+  const aimEnd = (e) => {
+    if (e.pointerId !== aimPointerId) return;
+    aimPointerId = null;
+    touchAimActive = false;
+    input.attack = false;
+  };
+  canvas.addEventListener('pointerup', aimEnd);
+  canvas.addEventListener('pointercancel', aimEnd);
 
-  // Action buttons
+  // also continuously update setupHover on canvas touch-move (for the visual
+  // hover preview) regardless of aim
+  canvas.addEventListener('touchmove', (e) => {
+    if (!e.touches[0]) return;
+    const t = e.touches[0];
+    const p = getCanvasPoint(t);
+    mouseWorld.x = p.wx; mouseWorld.y = p.wy;
+    if (lastSnap?.maze) {
+      const cs = lastSnap.maze.cellSize;
+      setupHover = { x: Math.floor(p.wx / cs), y: Math.floor(p.wy / cs) };
+    }
+  }, { passive: true });
+
+  function handleAim(e) {
+    const me = lastSnap.players.find(p => p.socketId === mySocketId);
+    if (!me) return;
+    const p = getCanvasPoint(e);
+    input.facing = Math.atan2(p.wy - me.y, p.wx - me.x);
+    input.attack = true;
+  }
+
+  // ---- Action buttons ----
   function bindHold(btnId, key) {
     const btn = $('#' + btnId);
     btn.addEventListener('pointerdown', (e) => { input[key] = true; e.preventDefault(); });
@@ -962,25 +1028,51 @@ function setupTouchControls() {
   bindHold('btnAbility', 'ability');
   bindHold('btnAstra', 'astra');
 
-  // Tap canvas during setup → place a trap (mobile-friendly)
-  canvas.addEventListener('touchend', (e) => {
-    if (lastSnap?.phase === 'setup' && setupHover) {
-      socket?.emit('placeTrap', { x: setupHover.x, y: setupHover.y });
-    }
+  // ---- Setup tool toggle ----
+  $$('.tool-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      setupTool = b.dataset.tool;
+      $$('.tool-btn').forEach(x => x.classList.toggle('active', x === b));
+    });
   });
-  // also keep mouseWorld in sync for touch
-  canvas.addEventListener('touchmove', (e) => {
-    if (!e.touches[0]) return;
-    const rect = canvas.getBoundingClientRect();
-    const sx = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
-    const sy = (e.touches[0].clientY - rect.top) * (canvas.height / rect.height);
-    mouseWorld.x = sx + camera.x;
-    mouseWorld.y = sy + camera.y;
-    if (lastSnap?.maze) {
-      const cs = lastSnap.maze.cellSize;
-      setupHover = { x: Math.floor(mouseWorld.x / cs), y: Math.floor(mouseWorld.y / cs) };
-    }
-  }, { passive: true });
 }
 
 setupTouchControls();
+
+// ---- Auto-aim: when no manual aim, face & fire at nearest visible enemy ----
+// Runs alongside the existing 30 Hz input pump.
+function autoAimTick() {
+  if (!IS_TOUCH || !lastSnap || lastSnap.phase !== 'break') return;
+  if (touchAimActive) return; // user is manually aiming
+  const me = lastSnap.players.find(p => p.socketId === mySocketId);
+  if (!me || !me.alive) return;
+  const enemies = lastSnap.players.filter(p => p.alive && p.team && p.team !== me.team);
+  if (!enemies.length) { input.attack = false; return; }
+  // pick nearest in view (within 360 px to match fog roughly)
+  let target = null, best = Infinity;
+  for (const e of enemies) {
+    const d = Math.hypot(e.x - me.x, e.y - me.y);
+    if (d < best && d < 360) { best = d; target = e; }
+  }
+  if (!target) { input.attack = false; return; }
+  // line of sight
+  if (!hasLOS(me, target)) { input.attack = false; return; }
+  input.facing = Math.atan2(target.y - me.y, target.x - me.x);
+  // weapon range gate (use a sensible default — 70% of "long")
+  const c = CHARACTERS[me.character];
+  const range = c?.basic?.kind === 'projectile' ? (c.basic.range * 0.85) : 60;
+  input.attack = best < range;
+}
+function hasLOS(a, b) {
+  const cs = lastSnap.maze.cellSize;
+  const wallSet = new Set(lastSnap.maze.walls);
+  const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (cs * 0.5));
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const x = a.x + (b.x - a.x) * t;
+    const y = a.y + (b.y - a.y) * t;
+    if (wallSet.has(Math.floor(x / cs) + ',' + Math.floor(y / cs))) return false;
+  }
+  return true;
+}
+setInterval(autoAimTick, 100); // 10 Hz is plenty for re-targeting

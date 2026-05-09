@@ -21,7 +21,7 @@
         <label>Room code<input id="roomId" maxlength="20" placeholder="kurukshetra" value="kurukshetra" /></label>
         <button id="btnJoin">⚔️ Enter the field</button>
         <button id="btnRulesJoin" class="secondary">📜 How to play</button>
-        <p class="hint">Share the room code + your ngrok URL with friends to play together.</p>
+        <p class="hint">Share this page's link + the room code with friends — they enter the same code and join your war.</p>
       </div>
     </section>
 
@@ -125,15 +125,23 @@
           <div class="stick-knob" id="moveKnob"></div>
           <div class="touch-label">MOVE</div>
         </div>
-        <div class="touch-zone touch-aim" id="touch-aim">
-          <div class="stick-base"></div>
-          <div class="stick-knob" id="aimKnob"></div>
-          <div class="touch-label">AIM · TAP TO FIRE</div>
-        </div>
         <div class="touch-buttons">
-          <button class="tbtn" id="btnAbility">E</button>
-          <button class="tbtn astra" id="btnAstra">Q</button>
+          <button class="tbtn ability-btn" id="btnAbility" aria-label="Active ability">
+            <span class="key-glyph">E</span>
+            <span class="ability-label">ABILITY</span>
+          </button>
+          <button class="tbtn astra-btn" id="btnAstra" aria-label="Astra">
+            <span class="key-glyph">★</span>
+            <span class="ability-label">ASTRA</span>
+          </button>
         </div>
+        <!-- Setup-phase tool toggle (visible only during setup) -->
+        <div class="setup-tools" id="setupTools">
+          <button class="tool-btn active" data-tool="trap">🪤 Trap</button>
+          <button class="tool-btn" data-tool="wall">🧱 Wall</button>
+        </div>
+        <!-- Auto-aim hint -->
+        <div class="aim-hint" id="aimHint">Tap canvas to aim · auto-fires</div>
       </div>
     </section>
 
